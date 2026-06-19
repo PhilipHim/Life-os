@@ -7,13 +7,32 @@ import { useFocus } from '@/lib/FocusContext'
 import { useDailyPlan } from '@/lib/DailyPlanContext'
 import { formatFocusTime } from '@/lib/focus'
 import { computeProductivityScore, generateProductivityInsights, type ProductivityScore } from '@/lib/productivity-score'
-import { computeWorkCompletionRate, computeAverageGroupProgress } from '@/lib/score'
 import { useHabits } from '@/lib/HabitContext'
 import { getInsights } from '@/lib/insights'
 import { getWeeklyReport, type WeeklyReport } from '@/lib/weekly'
 import { computeLifeScore } from '@/lib/life-score'
 import type { LifeScoreResult } from '@/lib/life-score'
+import { getSleepEntryByDate } from '@/lib/db/sleep'
+import { getHealthEntryByDate } from '@/lib/db/health'
+import { getHealthEvents, computeHealthStatus } from '@/lib/db/health-illness'
+import { getJournalEntryByDate } from '@/lib/db/journal'
+import { computeHealthScore } from '@/lib/health-score'
+import { getCharacterAreas } from '@/lib/db/character'
+import {
+  getAssets,
+  getWatchlistAssets,
+  computeAggregatedPerformance,
+  computeStockPerformance,
+} from '@/lib/db/finance'
+import type { CharacterArea, JournalEntry } from '@/lib/types'
 import Card from '@/components/ui/Card'
+
+const PRIORITY_ORDER: Record<string, number> = { H1: 0, H2: 1, M: 2, L: 3 }
+
+function todayLocal(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
 function BreakDownRow({
   label,
@@ -40,60 +59,112 @@ function BreakDownRow({
           style={{ width: `${Math.min(percentage, 100)}%` }}
         />
       </div>
-      <div className="flex justify-between text-xs text-gray-400 mt-0.5">
-        <span />
-        <span>{Math.round(percentage)}%</span>
-      </div>
     </div>
   )
 }
 
-function KpiCard({
+function SectionHeading({ title, href, linkLabel }: { title: string; href?: string; linkLabel?: string }) {
+  return (
+    <div className="flex items-center justify-between mb-4">
+      <h2 className="text-sm font-semibold uppercase tracking-widest text-gray-400">{title}</h2>
+      {href && linkLabel && (
+        <Link href={href} className="text-xs text-gray-500 hover:text-gray-900 transition-colors">
+          {linkLabel} →
+        </Link>
+      )}
+    </div>
+  )
+}
+
+function CompactKpiCard({
   label,
   metric,
   sublabel,
   progress,
   href,
-  children,
 }: {
   label: string
   metric: string
   sublabel?: string
   progress?: number
   href: string
-  children?: React.ReactNode
 }) {
   return (
     <Link href={href} className="block group">
-      <Card className="transition-all duration-200 group-hover:border-gray-300 group-hover:shadow-md group-hover:-translate-y-0.5 cursor-pointer h-full">
-        <p className="text-xs font-medium uppercase tracking-widest text-gray-400">{label}</p>
-        <p className="mt-2 text-4xl font-bold text-gray-900">{metric}</p>
-        {sublabel && (
-          <p className="mt-1 text-sm text-gray-500">{sublabel}</p>
-        )}
+      <Card className="p-4 transition-all duration-200 group-hover:border-gray-300 group-hover:shadow-md group-hover:-translate-y-0.5 cursor-pointer h-full">
+        <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400">{label}</p>
+        <p className="mt-1.5 text-2xl font-bold text-gray-900 tabular-nums">{metric}</p>
+        {sublabel && <p className="mt-0.5 text-xs text-gray-500">{sublabel}</p>}
         {progress !== undefined && (
-          <div className="mt-3 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+          <div className="mt-2 h-1 rounded-full bg-gray-100 overflow-hidden">
             <div
               className="h-full rounded-full bg-gray-900 transition-all duration-500"
               style={{ width: `${Math.min(progress, 100)}%` }}
             />
           </div>
         )}
-        {children}
       </Card>
     </Link>
   )
 }
 
+function isJournalCompletedToday(entry: JournalEntry | undefined): boolean {
+  if (!entry) return false
+  const hasText = [
+    entry.gratitude,
+    entry.intentions,
+    entry.affirmations,
+    entry.wins,
+    entry.lessonsLearned,
+    entry.reflection,
+    entry.tomorrowFocus,
+  ].some((t) => t.trim().length > 0)
+  return hasText || entry.updatedAt > entry.createdAt
+}
+
+function computeFocusStreak(sessionDates: Set<string>): number {
+  const d = new Date()
+  const todayStr = todayLocal()
+  if (!sessionDates.has(todayStr)) {
+    d.setDate(d.getDate() - 1)
+  }
+  let streak = 0
+  while (true) {
+    const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    if (sessionDates.has(ds)) {
+      streak++
+      d.setDate(d.getDate() - 1)
+    } else {
+      break
+    }
+  }
+  return streak
+}
+
+function formatPct(value: number): string {
+  const sign = value > 0 ? '+' : ''
+  return `${sign}${value.toFixed(2)}%`
+}
+
 export default function DashboardPage() {
   const { workItems } = useWorkItems()
-  const { focusSessions } = useFocus()
-  const { planItems } = useDailyPlan()
-  const { buildDone, buildTotal, avoidSuccess, avoidTotal, habitScore } = useHabits()
+  const { focusSessions, activeSession } = useFocus()
+  const { planItems, todayPlan } = useDailyPlan()
+  const { buildDone, buildTotal, avoidSuccess, avoidTotal } = useHabits()
   const todayHabitsDone = buildDone + avoidSuccess
   const todayHabitsTotal = buildTotal + avoidTotal
   const [insights, setInsights] = useState<ReturnType<typeof getInsights>>([])
   const [weeklyReport, setWeeklyReport] = useState<WeeklyReport | null>(null)
+  const [characterAreas, setCharacterAreas] = useState<CharacterArea[]>([])
+
+  const todayStr = todayLocal()
+
+  useEffect(() => {
+    setInsights(getInsights())
+    setWeeklyReport(getWeeklyReport())
+    setCharacterAreas(getCharacterAreas())
+  }, [workItems, focusSessions, planItems])
+
   const habitStats = useMemo(() => ({
     completed: todayHabitsDone,
     total: todayHabitsTotal,
@@ -131,394 +202,413 @@ export default function DashboardPage() {
     return merged
   }, [todayInsights, insights])
 
-  const singles = workItems.filter((i) => i.type === 'single' && i.status !== 'deleted')
-  const groups = workItems.filter((i) => i.type === 'group' && i.status !== 'deleted')
-  const totalSingles = singles.length
-  const doneSingles = singles.filter((i) => i.status === 'completed').length
-  const workCompletionRate = Math.round(computeWorkCompletionRate(workItems) * 100)
-  const remaining = totalSingles - doneSingles
+  const lifeOsSnapshot = useMemo(() => {
+    const sleepEntry = getSleepEntryByDate(todayStr)
+    const healthEntry = getHealthEntryByDate(todayStr)
+    const journalEntry = getJournalEntryByDate(todayStr)
+    const healthStatus = computeHealthStatus(getHealthEvents(), todayStr)
 
-  const avgGroupProgress = computeAverageGroupProgress(workItems)
-  const completedGroups = groups.filter((i) => i.status === 'completed').length
+    const assets = getAssets()
+    const watchlist = getWatchlistAssets()
+    const portfolioPerf = computeAggregatedPerformance(assets)
+
+    let bestAsset: { symbol: string; pct: number } | null = null
+    let worstAsset: { symbol: string; pct: number } | null = null
+    for (const asset of assets) {
+      const { dailyChangePct } = computeStockPerformance(asset)
+      if (!bestAsset || dailyChangePct > bestAsset.pct) {
+        bestAsset = { symbol: asset.symbol, pct: dailyChangePct }
+      }
+      if (!worstAsset || dailyChangePct < worstAsset.pct) {
+        worstAsset = { symbol: asset.symbol, pct: dailyChangePct }
+      }
+    }
+
+    return {
+      sleepScore: sleepEntry?.sleepScore ?? null,
+      healthScore: healthEntry ? computeHealthScore(healthEntry).total : null,
+      daysWithoutIllness: healthStatus.status === 'healthy' ? healthStatus.streakDays : 0,
+      isSick: healthStatus.status === 'sick',
+      journalCompleted: isJournalCompletedToday(journalEntry),
+      portfolioDailyPct: portfolioPerf.dailyChangePct,
+      bestAsset,
+      worstAsset,
+      watchlistCount: watchlist.length,
+      portfolioCount: assets.length,
+    }
+  }, [todayStr, workItems, focusSessions, planItems])
 
   const habitRate = todayHabitsTotal > 0 ? Math.round((todayHabitsDone / todayHabitsTotal) * 100) : 0
 
-  const todayFocusStats = useMemo(() => {
-    const today = new Date()
-    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
-    const todaySessions = focusSessions.filter((s) => s.date === todayStr && s.duration > 0)
-    const totalMs = todaySessions.reduce((sum, s) => sum + s.duration, 0)
-    const longestMs = todaySessions.reduce((max, s) => Math.max(max, s.duration), 0)
-    return { totalMs, sessionCount: todaySessions.length, longestMs }
-  }, [focusSessions])
-
-  const weekFocusStats = useMemo(() => {
-    const now = new Date()
-    const day = now.getDay()
-    const diff = now.getDate() - day + (day === 0 ? -6 : 1)
-    const monday = new Date(now.setDate(diff))
-    const mondayStr = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`
-    const weekStart = new Date(mondayStr + 'T00:00:00')
-    const weekEnd = new Date(weekStart)
-    weekEnd.setDate(weekEnd.getDate() + 7)
-
-    const weekSessions = focusSessions.filter((s) => {
-      const d = new Date(s.date + 'T00:00:00')
-      return d >= weekStart && d < weekEnd && s.duration > 0
+  const dailyFocus = useMemo(() => {
+    const sortedPlan = [...todayPlan].sort((a, b) => {
+      if (a.orderIndex !== b.orderIndex) return a.orderIndex - b.orderIndex
+      return PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]
     })
 
-    const totalMs = weekSessions.reduce((sum, s) => sum + s.duration, 0)
-    const sessionCount = weekSessions.length
-    const avgSessionMs = sessionCount > 0 ? Math.round(totalMs / sessionCount) : 0
-
-    const byWorkItem = new Map<string, number>()
-    for (const s of weekSessions) {
-      byWorkItem.set(s.workItemId, (byWorkItem.get(s.workItemId) || 0) + s.duration)
-    }
-    let topWorkItemId: string | null = null
-    let topWorkItemMs = 0
-    for (const [id, ms] of byWorkItem) {
-      if (ms > topWorkItemMs) {
-        topWorkItemMs = ms
-        topWorkItemId = id
-      }
+    const isComplete = (workItemId: string) => {
+      const wi = workItems.find((w) => w.id === workItemId)
+      return wi?.status === 'completed'
     }
 
-    const topWorkItem = topWorkItemId ? workItems.find((w) => w.id === topWorkItemId) : null
+    const activeTaskTitle = activeSession?.taskTitle ?? null
 
-    return { totalMs, avgSessionMs, topWorkItemName: topWorkItem?.title ?? null, sessionCount }
-  }, [focusSessions, workItems])
+    const firstIncomplete = sortedPlan.find((pi) => !isComplete(pi.workItemId))
+    const currentTask = activeTaskTitle
+      ?? (firstIncomplete
+        ? workItems.find((w) => w.id === firstIncomplete.workItemId)?.title ?? 'Unknown task'
+        : null)
 
-  const perWorkItemFocus = useMemo(() => {
-    const today = new Date()
-    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
-    const map = new Map<string, { totalMs: number; todayMs: number; sessionCount: number }>()
+    const nextHighPriority = sortedPlan.find((pi) => {
+      if (isComplete(pi.workItemId)) return false
+      if (activeSession && pi.workItemId === activeSession.session.workItemId) return false
+      if (firstIncomplete && pi.id === firstIncomplete.id && !activeSession) return false
+      return pi.priority === 'H1' || pi.priority === 'H2'
+    })
+    const nextTaskTitle = nextHighPriority
+      ? workItems.find((w) => w.id === nextHighPriority.workItemId)?.title ?? null
+      : null
 
-    for (const s of focusSessions) {
-      if (s.duration === 0 || !s.workItemId) continue
-      const existing = map.get(s.workItemId) ?? { totalMs: 0, todayMs: 0, sessionCount: 0 }
-      existing.totalMs += s.duration
-      existing.sessionCount += 1
-      if (s.date === todayStr) {
-        existing.todayMs += s.duration
-      }
-      map.set(s.workItemId, existing)
-    }
+    const focusDates = new Set(
+      focusSessions.filter((s) => s.duration > 0).map((s) => s.date)
+    )
+    const focusStreak = computeFocusStreak(focusDates)
 
-    return map
-  }, [focusSessions])
+    const plannerCompletion = productivityScore.planner.percentage
+
+    return { currentTask, nextTaskTitle, focusStreak, plannerCompletion }
+  }, [todayPlan, workItems, activeSession, focusSessions, productivityScore.planner.percentage])
+
+  const topCharacterTraits = useMemo(() => {
+    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
+    return [...characterAreas]
+      .sort((a, b) => b.level - a.level)
+      .slice(0, 3)
+      .map((area) => ({
+        ...area,
+        updatedThisWeek: area.updatedAt >= weekAgo,
+      }))
+  }, [characterAreas])
+
+  const characterWeeklyTrend = useMemo(() => {
+    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
+    const activeCount = characterAreas.filter((a) => a.updatedAt >= weekAgo).length
+    return activeCount
+  }, [characterAreas])
 
   return (
     <div className="space-y-10">
-      <h1 className="text-4xl font-bold tracking-tight">Dashboard</h1>
+      <div className="space-y-1">
+        <h1 className="text-4xl font-bold tracking-tight">Command Center</h1>
+        <p className="text-base text-gray-500">Your Life OS overview — productivity, health, and daily progress at a glance</p>
+      </div>
 
+      {/* SECTION 1: Hero Scores */}
       <div className="grid gap-6 md:grid-cols-2">
-        <Card className="text-center">
-          <p className="text-xs font-medium uppercase tracking-widest text-gray-400">Productivity Score</p>
-          <p className="mt-2 text-7xl font-bold text-gray-900">
-            {productivityScore.total}
-            <span className="text-3xl font-normal text-gray-400"> / 100</span>
-          </p>
-          <div className="mt-4 h-2 rounded-full bg-gray-100 overflow-hidden max-w-md mx-auto">
-            <div
-              className="h-full rounded-full bg-gray-900 transition-all duration-700 ease-out"
-              style={{ width: `${productivityScore.total}%` }}
-            />
-          </div>
-          <div className="mt-6 space-y-3 max-w-md mx-auto">
-            <BreakDownRow
-              label="Planner"
-              score={productivityScore.planner.score}
-              max={productivityScore.planner.max}
-              percentage={productivityScore.planner.percentage}
-            />
-            <BreakDownRow
-              label="Priority"
-              score={productivityScore.priority.score}
-              max={productivityScore.priority.max}
-              percentage={productivityScore.priority.percentage}
-            />
-            <BreakDownRow
-              label="Focus"
-              score={productivityScore.focus.score}
-              max={productivityScore.focus.max}
-              percentage={productivityScore.focus.percentage}
-            />
-            <BreakDownRow
-              label="Habits"
-              score={productivityScore.habits.score}
-              max={productivityScore.habits.max}
-              percentage={productivityScore.habits.percentage}
-            />
-            <div className="border-t border-gray-100 pt-4">
-              <div className="flex items-center justify-between text-sm font-semibold text-gray-900">
-                <span>Total</span>
-                <span className="tabular-nums">{productivityScore.total} / 100</span>
-              </div>
-              <div className="mt-1.5 h-2 rounded-full bg-gray-100 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-gray-900 transition-all duration-700 ease-out"
-                  style={{ width: `${productivityScore.total}%` }}
-                />
-              </div>
+        <Card className="relative overflow-hidden ring-1 ring-gray-900/5 shadow-md">
+          <div className="absolute inset-x-0 top-0 h-1 bg-gray-900" />
+          <div className="text-center pt-2">
+            <p className="text-xs font-medium uppercase tracking-widest text-gray-400">Productivity Score</p>
+            <p className="mt-3 text-7xl font-bold text-gray-900 tabular-nums leading-none">
+              {productivityScore.total}
+              <span className="text-3xl font-normal text-gray-400"> / 100</span>
+            </p>
+            <div className="mt-4 h-2.5 rounded-full bg-gray-100 overflow-hidden max-w-sm mx-auto">
+              <div
+                className="h-full rounded-full bg-gray-900 transition-all duration-700 ease-out"
+                style={{ width: `${productivityScore.total}%` }}
+              />
+            </div>
+            <div className="mt-6 space-y-2.5 max-w-sm mx-auto text-left">
+              <BreakDownRow label="Planner" score={productivityScore.planner.score} max={productivityScore.planner.max} percentage={productivityScore.planner.percentage} />
+              <BreakDownRow label="Priority" score={productivityScore.priority.score} max={productivityScore.priority.max} percentage={productivityScore.priority.percentage} />
+              <BreakDownRow label="Focus" score={productivityScore.focus.score} max={productivityScore.focus.max} percentage={productivityScore.focus.percentage} />
+              <BreakDownRow label="Habits" score={productivityScore.habits.score} max={productivityScore.habits.max} percentage={productivityScore.habits.percentage} />
             </div>
           </div>
         </Card>
 
         {lifeScore && (
-          <Card className="text-center">
-            <p className="text-xs font-medium uppercase tracking-widest text-gray-400">Life Score</p>
-            <p className="mt-2 text-7xl font-bold text-gray-900">
-              {lifeScore.total}
-              <span className="text-3xl font-normal text-gray-400"> / {lifeScore.max}</span>
-            </p>
-            <div className="mt-4 h-2 rounded-full bg-gray-100 overflow-hidden max-w-md mx-auto">
-              <div
-                className="h-full rounded-full bg-gray-900 transition-all duration-700 ease-out"
-                style={{ width: `${lifeScore.total}%` }}
-              />
-            </div>
-            <div className="mt-6 space-y-3 max-w-md mx-auto">
-              <BreakDownRow
-                label="Productivity"
-                score={lifeScore.productivity}
-                max={lifeScore.max}
-                percentage={lifeScore.productivity}
-              />
-              <BreakDownRow
-                label="Health"
-                score={lifeScore.health ?? 0}
-                max={lifeScore.max}
-                percentage={lifeScore.health ?? 0}
-              />
-              <BreakDownRow
-                label="Mind"
-                score={lifeScore.mind}
-                max={lifeScore.max}
-                percentage={lifeScore.mind}
-              />
-              <BreakDownRow
-                label="Habits"
-                score={lifeScore.habits}
-                max={lifeScore.max}
-                percentage={lifeScore.habits}
-              />
+          <Card className="relative overflow-hidden ring-1 ring-gray-900/5 shadow-md">
+            <div className="absolute inset-x-0 top-0 h-1 bg-gray-400" />
+            <div className="text-center pt-2">
+              <p className="text-xs font-medium uppercase tracking-widest text-gray-400">Life Score</p>
+              <p className="mt-3 text-7xl font-bold text-gray-900 tabular-nums leading-none">
+                {lifeScore.total}
+                <span className="text-3xl font-normal text-gray-400"> / {lifeScore.max}</span>
+              </p>
+              <div className="mt-4 h-2.5 rounded-full bg-gray-100 overflow-hidden max-w-sm mx-auto">
+                <div
+                  className="h-full rounded-full bg-gray-900 transition-all duration-700 ease-out"
+                  style={{ width: `${lifeScore.total}%` }}
+                />
+              </div>
+              <div className="mt-6 space-y-2.5 max-w-sm mx-auto text-left">
+                <BreakDownRow label="Productivity" score={lifeScore.productivity} max={lifeScore.max} percentage={lifeScore.productivity} />
+                <BreakDownRow label="Health" score={lifeScore.health ?? 0} max={lifeScore.max} percentage={lifeScore.health ?? 0} />
+                <BreakDownRow label="Mind" score={lifeScore.mind} max={lifeScore.max} percentage={lifeScore.mind} />
+                <BreakDownRow label="Habits" score={lifeScore.habits} max={lifeScore.max} percentage={lifeScore.habits} />
+              </div>
             </div>
           </Card>
         )}
       </div>
 
-      <Card>
-        <p className="text-xs font-medium uppercase tracking-widest text-gray-400 mb-4">Today&rsquo;s Habits</p>
-        <div className="space-y-4">
-          <div>
-            <div className="flex items-center justify-between text-sm mb-1">
-              <span className="text-gray-700">Build Habits</span>
-              <span className="text-gray-900 font-medium tabular-nums">{buildDone}<span className="text-gray-400 font-normal"> / {buildTotal}</span></span>
+      {/* SECTION 2: Today Overview */}
+      <div>
+        <SectionHeading title="Today Overview" href="/life-os" linkLabel="Open Life OS" />
+        <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+          <CompactKpiCard
+            label="Sleep Score"
+            metric={lifeOsSnapshot.sleepScore != null ? String(lifeOsSnapshot.sleepScore) : '—'}
+            sublabel={lifeOsSnapshot.sleepScore != null ? 'Logged today' : 'Not logged'}
+            href="/life-os"
+          />
+          <CompactKpiCard
+            label="Health Score"
+            metric={lifeOsSnapshot.healthScore != null ? String(lifeOsSnapshot.healthScore) : '—'}
+            sublabel={lifeOsSnapshot.healthScore != null ? 'Logged today' : 'Not logged'}
+            href="/life-os"
+          />
+          <CompactKpiCard
+            label="Days Without Illness"
+            metric={lifeOsSnapshot.isSick ? '0' : String(lifeOsSnapshot.daysWithoutIllness)}
+            sublabel={lifeOsSnapshot.isSick ? 'Currently sick' : 'Healthy streak'}
+            href="/life-os"
+          />
+          <CompactKpiCard
+            label="Journal Today"
+            metric={lifeOsSnapshot.journalCompleted ? 'Done' : '—'}
+            sublabel={lifeOsSnapshot.journalCompleted ? 'Entry saved' : 'Not completed'}
+            href="/life-os"
+          />
+          <CompactKpiCard
+            label="Habits Today"
+            metric={todayHabitsTotal > 0 ? `${habitRate}%` : '—'}
+            sublabel={todayHabitsTotal > 0 ? `${todayHabitsDone}/${todayHabitsTotal} done` : 'No habits'}
+            progress={habitRate}
+            href="/habits/today"
+          />
+        </div>
+      </div>
+
+      {/* SECTION 3: Daily Focus */}
+      <div>
+        <SectionHeading title="Daily Focus" href="/plan" linkLabel="Open Planner" />
+        <Card>
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400">Active Task</p>
+              <p className="mt-1.5 text-sm font-semibold text-gray-900 truncate">
+                {dailyFocus.currentTask ?? 'None in focus'}
+              </p>
+              {activeSession && (
+                <p className="mt-0.5 text-xs text-green-600 font-medium">In focus now</p>
+              )}
             </div>
-            <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
-              <div
-                className="h-full rounded-full bg-gray-900 transition-all duration-500"
-                style={{ width: `${buildTotal > 0 ? (buildDone / buildTotal) * 100 : 0}%` }}
-              />
+            <div>
+              <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400">Next Priority</p>
+              <p className="mt-1.5 text-sm font-semibold text-gray-900 truncate">
+                {dailyFocus.nextTaskTitle ?? 'No high-priority items'}
+              </p>
+              <Link href="/work" className="mt-0.5 text-xs text-gray-500 hover:text-gray-900 transition-colors">
+                View work items →
+              </Link>
+            </div>
+            <div>
+              <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400">Focus Streak</p>
+              <p className="mt-1.5 text-2xl font-bold text-gray-900 tabular-nums">
+                {dailyFocus.focusStreak}
+                <span className="text-sm font-normal text-gray-400"> days</span>
+              </p>
+              <p className="mt-0.5 text-xs text-gray-500">Consecutive days with focus</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400">Planner Completion</p>
+              <p className="mt-1.5 text-2xl font-bold text-gray-900 tabular-nums">
+                {Math.round(dailyFocus.plannerCompletion)}%
+              </p>
+              <div className="mt-2 h-1 rounded-full bg-gray-100 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-gray-900 transition-all duration-500"
+                  style={{ width: `${Math.min(dailyFocus.plannerCompletion, 100)}%` }}
+                />
+              </div>
             </div>
           </div>
-          <div>
-            <div className="flex items-center justify-between text-sm mb-1">
-              <span className="text-gray-700">Avoid Habits</span>
-              <span className="text-gray-900 font-medium tabular-nums">{avoidSuccess}<span className="text-gray-400 font-normal"> / {avoidTotal}</span></span>
-            </div>
-            <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
-              <div
-                className="h-full rounded-full bg-green-600 transition-all duration-500"
-                style={{ width: `${avoidTotal > 0 ? (avoidSuccess / avoidTotal) * 100 : 0}%` }}
-              />
-            </div>
-          </div>
-          {habitScore.total > 0 && (
-            <div className="border-t border-gray-100 pt-3 flex items-center justify-between">
-              <span className="text-sm font-semibold text-gray-900">Habit Score</span>
-              <span className="text-lg font-bold text-gray-900 tabular-nums">{habitScore.total}<span className="text-sm font-normal text-gray-400">/100</span></span>
+        </Card>
+      </div>
+
+      {/* SECTION 4: Character Development */}
+      <div>
+        <SectionHeading title="Character Development" href="/life-os" linkLabel="View all traits" />
+        <Card>
+          {topCharacterTraits.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-2">No character traits yet</p>
+          ) : (
+            <>
+              <div className="grid gap-4 sm:grid-cols-3">
+                {topCharacterTraits.map((trait) => (
+                  <div key={trait.id} className="rounded-lg bg-gray-50 px-4 py-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-semibold text-gray-900">{trait.name}</p>
+                      {trait.updatedThisWeek && (
+                        <span className="text-[10px] font-medium text-green-600">↑ this week</span>
+                      )}
+                    </div>
+                    <p className="mt-1 text-xl font-bold text-gray-900 tabular-nums">
+                      {trait.level}<span className="text-sm font-normal text-gray-400">/10</span>
+                    </p>
+                    <div className="mt-2 h-1.5 rounded-full bg-gray-200 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-gray-900 transition-all duration-500"
+                        style={{ width: `${(trait.level / 10) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-3 text-xs text-gray-400">
+                {characterWeeklyTrend} trait{characterWeeklyTrend !== 1 ? 's' : ''} updated this week
+              </p>
+            </>
+          )}
+        </Card>
+      </div>
+
+      {/* SECTION 5: Finance Snapshot */}
+      <div>
+        <SectionHeading title="Finance Snapshot" href="/life-os" linkLabel="View portfolio" />
+        <Card>
+          {lifeOsSnapshot.portfolioCount === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-2">No portfolio assets — add stocks in Life OS</p>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400">Portfolio Today</p>
+                <p className={`mt-1.5 text-2xl font-bold tabular-nums ${lifeOsSnapshot.portfolioDailyPct >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                  {formatPct(lifeOsSnapshot.portfolioDailyPct)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400">Best Today</p>
+                <p className="mt-1.5 text-sm font-semibold text-gray-900">
+                  {lifeOsSnapshot.bestAsset?.symbol ?? '—'}
+                </p>
+                {lifeOsSnapshot.bestAsset && (
+                  <p className="text-xs text-green-600 tabular-nums">{formatPct(lifeOsSnapshot.bestAsset.pct)}</p>
+                )}
+              </div>
+              <div>
+                <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400">Worst Today</p>
+                <p className="mt-1.5 text-sm font-semibold text-gray-900">
+                  {lifeOsSnapshot.worstAsset?.symbol ?? '—'}
+                </p>
+                {lifeOsSnapshot.worstAsset && (
+                  <p className="text-xs text-red-500 tabular-nums">{formatPct(lifeOsSnapshot.worstAsset.pct)}</p>
+                )}
+              </div>
+              <div>
+                <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400">Watchlist</p>
+                <p className="mt-1.5 text-2xl font-bold text-gray-900 tabular-nums">
+                  {lifeOsSnapshot.watchlistCount}
+                </p>
+                <p className="text-xs text-gray-500">{lifeOsSnapshot.portfolioCount} in portfolio</p>
+              </div>
             </div>
           )}
-        </div>
-      </Card>
+        </Card>
+      </div>
 
+      {/* SECTION 6: Quick Actions */}
+      <div>
+        <SectionHeading title="Quick Actions" />
+        <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+          {[
+            { href: '/work', label: 'Add Task', icon: '+' },
+            { href: '/plan', label: 'Open Planner', icon: '☰' },
+            { href: '/life-os', label: 'Add Journal', icon: '✎' },
+            { href: '/life-os', label: 'Record Sleep', icon: '☾' },
+            { href: '/life-os', label: 'Record Health', icon: '♥' },
+            { href: '/life-os', label: 'Add Business Idea', icon: '💡' },
+          ].map((action) => (
+            <Link key={action.label} href={action.href} className="block group">
+              <Card className="p-4 text-center transition-all group-hover:border-gray-300 group-hover:shadow-md group-hover:-translate-y-0.5 cursor-pointer">
+                <span className="text-lg font-semibold text-gray-900">{action.icon}</span>
+                <p className="text-xs text-gray-600 mt-1">{action.label}</p>
+              </Card>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      {/* Compact insights & weekly trends (preserved functionality) */}
       {allInsights.length > 0 && (
         <div>
-          <h2 className="text-xl font-semibold tracking-tight mb-4">Insights</h2>
-          <div className="space-y-3">
-            {allInsights.map((insight) => (
-              <Card key={insight.title + '|' + insight.description} className={`border-l-4 ${insight.type === 'positive' ? 'border-l-green-500' : insight.type === 'negative' ? 'border-l-red-400' : 'border-l-yellow-400'}`}>
-                <div className="flex items-start gap-3">
-                  <span className="text-lg shrink-0 mt-0.5">
-                    {insight.type === 'positive' ? '✓' : insight.type === 'negative' ? '!' : 'i'}
-                  </span>
-                  <div>
-                    <p className="font-semibold text-gray-900 text-sm">{insight.title}</p>
-                    <p className="text-sm text-gray-500 mt-0.5">{insight.description}</p>
-                  </div>
-                </div>
+          <SectionHeading title="Insights" href="/analytics" linkLabel="View analytics" />
+          <div className="space-y-2">
+            {allInsights.slice(0, 3).map((insight) => (
+              <Card key={insight.title + '|' + insight.description} className={`p-4 border-l-4 ${insight.type === 'positive' ? 'border-l-green-500' : insight.type === 'negative' ? 'border-l-red-400' : 'border-l-yellow-400'}`}>
+                <p className="font-semibold text-gray-900 text-sm">{insight.title}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{insight.description}</p>
               </Card>
             ))}
           </div>
         </div>
       )}
 
-      <div className="grid gap-5 sm:grid-cols-3">
-        <KpiCard
-          label="Work Completion"
-          metric={`${doneSingles}/${totalSingles}`}
-          sublabel={totalSingles > 0 ? `${workCompletionRate}% · ${remaining} remaining` : 'No items'}
-          progress={workCompletionRate}
-          href="/work"
-        />
-
-        <KpiCard
-          label="Groups"
-          metric={`${groups.length}`}
-          sublabel={
-            groups.length > 0
-              ? `${avgGroupProgress}% avg progress · ${completedGroups} completed`
-              : 'No groups'
-          }
-          progress={avgGroupProgress}
-          href="/work"
-        />
-
-        <KpiCard
-          label="Habits"
-          metric={todayHabitsTotal > 0 ? `${habitRate}%` : '—'}
-          sublabel={
-            todayHabitsTotal > 0
-              ? `Build ${buildDone}/${buildTotal} · Avoid ${avoidSuccess}/${avoidTotal}`
-              : 'No habits'
-          }
-          progress={habitRate}
-          href="/habits/today"
-        >
-          {todayHabitsTotal > 0 && habitScore.total > 0 && (
-            <p className="mt-2 text-xs text-gray-400">
-              Score: {habitScore.total}/100
-            </p>
-          )}
-        </KpiCard>
-      </div>
-
-      <Card>
-        <p className="text-xs font-medium uppercase tracking-widest text-gray-400">Focus Analytics</p>
-        <div className="mt-5 grid gap-6 sm:grid-cols-2">
-          <div>
-            <p className="text-sm font-semibold text-gray-900">Today</p>
-            <p className="mt-2 text-2xl font-bold text-gray-900">
-              {formatFocusTime(todayFocusStats.totalMs)}
-            </p>
-            <p className="mt-0.5 text-sm text-gray-500">
-              {todayFocusStats.sessionCount} session{todayFocusStats.sessionCount !== 1 ? 's' : ''}
-              {todayFocusStats.longestMs > 0 && (
-                <> · Longest: {formatFocusTime(todayFocusStats.longestMs)}</>
-              )}
-            </p>
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-gray-900">This Week</p>
-            <p className="mt-2 text-2xl font-bold text-gray-900">
-              {formatFocusTime(weekFocusStats.totalMs)}
-            </p>
-            <p className="mt-0.5 text-sm text-gray-500">
-              {weekFocusStats.sessionCount} sessions · Avg: {formatFocusTime(weekFocusStats.avgSessionMs)}
-            </p>
-            {weekFocusStats.topWorkItemName && (
-              <p className="mt-1 text-sm text-gray-500">
-                Most focused: {weekFocusStats.topWorkItemName}
-              </p>
-            )}
-          </div>
-        </div>
-        {(() => {
-          const items = Array.from(perWorkItemFocus.entries())
-            .filter(([id]) => id)
-            .sort(([, a], [, b]) => b.totalMs - a.totalMs)
-            .slice(0, 10)
-          if (items.length === 0) return null
-          return (
-            <div className="mt-5 border-t border-gray-100 pt-4">
-              <p className="text-xs font-medium uppercase tracking-widest text-gray-400 mb-3">Per Work Item</p>
-              <div className="grid gap-2">
-                {items.map(([workItemId, stats]) => {
-                  const wi = workItems.find((w) => w.id === workItemId)
-                  return (
-                    <div key={workItemId} className="flex items-center justify-between text-sm">
-                      <span className="text-gray-900 truncate">{wi?.title ?? 'Unknown'}</span>
-                      <div className="flex items-center gap-4 shrink-0">
-                        <span className="text-gray-500 tabular-nums">{formatFocusTime(stats.totalMs)} total</span>
-                        <span className="text-gray-400 tabular-nums">{formatFocusTime(stats.todayMs)} today</span>
-                        <span className="text-gray-400 tabular-nums">{stats.sessionCount} sessions</span>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )
-        })()}
-      </Card>
-
       {weeklyReport && (
-        <Card>
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-xs font-medium uppercase tracking-widest text-gray-400">Weekly Trends</p>
-            <Link href="/analytics" className="text-xs text-gray-500 hover:text-gray-900 transition-colors">
-              View Details →
-            </Link>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div>
-              <p className="text-sm text-gray-500">Focus</p>
-              <div className="flex items-baseline gap-1.5 mt-1">
-                <p className="text-xl font-bold text-gray-900">{Math.round(weeklyReport.current.totalFocusMinutes / 60 * 10) / 10}h</p>
-                {weeklyReport.focusTrend !== 0 && (
-                  <span className={`text-xs font-medium ${weeklyReport.focusTrend > 0 ? 'text-green-600' : 'text-red-500'}`}>
-                    {weeklyReport.focusTrend > 0 ? '↑' : '↓'} {Math.abs(weeklyReport.focusTrend)}%
-                  </span>
-                )}
+        <div>
+          <SectionHeading title="Weekly Trends" href="/analytics" linkLabel="View details" />
+          <Card className="p-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div>
+                <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400">Focus</p>
+                <p className="mt-1 text-lg font-bold text-gray-900 tabular-nums">
+                  {Math.round(weeklyReport.current.totalFocusMinutes / 60 * 10) / 10}h
+                  {weeklyReport.focusTrend !== 0 && (
+                    <span className={`ml-1 text-xs font-medium ${weeklyReport.focusTrend > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                      {weeklyReport.focusTrend > 0 ? '↑' : '↓'}{Math.abs(weeklyReport.focusTrend)}%
+                    </span>
+                  )}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400">Score</p>
+                <p className="mt-1 text-lg font-bold text-gray-900 tabular-nums">
+                  {weeklyReport.current.avgScore}
+                  {weeklyReport.scoreTrend !== 0 && (
+                    <span className={`ml-1 text-xs font-medium ${weeklyReport.scoreTrend > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                      {weeklyReport.scoreTrend > 0 ? '↑' : '↓'}{Math.abs(weeklyReport.scoreTrend)}
+                    </span>
+                  )}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400">Items Done</p>
+                <p className="mt-1 text-lg font-bold text-gray-900 tabular-nums">
+                  {weeklyReport.current.totalTasksCompleted}
+                  {weeklyReport.taskTrend !== 0 && (
+                    <span className={`ml-1 text-xs font-medium ${weeklyReport.taskTrend > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                      {weeklyReport.taskTrend > 0 ? '↑' : '↓'}{Math.abs(weeklyReport.taskTrend)}%
+                    </span>
+                  )}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400">Habit Score</p>
+                <p className="mt-1 text-lg font-bold text-gray-900 tabular-nums">
+                  {weeklyReport.current.avgHabitScore}
+                  {weeklyReport.habitTrend !== 0 && (
+                    <span className={`ml-1 text-xs font-medium ${weeklyReport.habitTrend > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                      {weeklyReport.habitTrend > 0 ? '↑' : '↓'}{Math.abs(weeklyReport.habitTrend)}
+                    </span>
+                  )}
+                </p>
               </div>
             </div>
-            <div>
-              <p className="text-sm text-gray-500">Score</p>
-              <div className="flex items-baseline gap-1.5 mt-1">
-                <p className="text-xl font-bold text-gray-900">{weeklyReport.current.avgScore}</p>
-                {weeklyReport.scoreTrend !== 0 && (
-                  <span className={`text-xs font-medium ${weeklyReport.scoreTrend > 0 ? 'text-green-600' : 'text-red-500'}`}>
-                    {weeklyReport.scoreTrend > 0 ? '↑' : '↓'} {Math.abs(weeklyReport.scoreTrend)}
-                  </span>
-                )}
-              </div>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Items Done</p>
-              <div className="flex items-baseline gap-1.5 mt-1">
-                <p className="text-xl font-bold text-gray-900">{weeklyReport.current.totalTasksCompleted}</p>
-                {weeklyReport.taskTrend !== 0 && (
-                  <span className={`text-xs font-medium ${weeklyReport.taskTrend > 0 ? 'text-green-600' : 'text-red-500'}`}>
-                    {weeklyReport.taskTrend > 0 ? '↑' : '↓'} {Math.abs(weeklyReport.taskTrend)}%
-                  </span>
-                )}
-              </div>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Habit Score</p>
-              <div className="flex items-baseline gap-1.5 mt-1">
-                <p className="text-xl font-bold text-gray-900">{weeklyReport.current.avgHabitScore}</p>
-                {weeklyReport.habitTrend !== 0 && (
-                  <span className={`text-xs font-medium ${weeklyReport.habitTrend > 0 ? 'text-green-600' : 'text-red-500'}`}>
-                    {weeklyReport.habitTrend > 0 ? '↑' : '↓'} {Math.abs(weeklyReport.habitTrend)}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-        </Card>
+          </Card>
+        </div>
       )}
     </div>
   )

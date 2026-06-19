@@ -2,17 +2,34 @@
 
 import { useMemo } from 'react'
 import { getDailyStats } from '@/lib/analytics'
-import { getUnifiedScore, computeHabitScoreForDate } from '@/lib/score'
+import { getUnifiedScore } from '@/lib/score'
 import { computeHealthScore } from '@/lib/health-score'
-import type { HealthScoreResult } from '@/lib/health-score'
 import { getWorkItems } from '@/lib/db/work-items'
 import { getAllSessions } from '@/lib/focus'
 import { getHabits } from '@/lib/db/habits'
 import { getEntries } from '@/lib/db/habit-entries'
 import { getHealthEntries } from '@/lib/db/health'
 import { getJournalEntries } from '@/lib/db/journal'
+import { getSleepEntries } from '@/lib/db/sleep'
+import { getHealthEvents } from '@/lib/db/health-illness'
+import { getCharacterAreas } from '@/lib/db/character'
+import { getAssets, getWatchlistAssets } from '@/lib/db/finance'
+import {
+  computeSleepAnalytics,
+  computeHealthTrendAnalytics,
+  computeCharacterAnalytics,
+  computeFinanceAnalytics,
+  formatDuration,
+  formatPct,
+  type SleepAnalytics,
+  type HealthTrendAnalytics,
+  type CharacterAnalytics,
+  type FinanceAnalytics,
+} from '@/lib/life-analytics'
 import { computeLifeScore } from '@/lib/life-score'
 import Card from '@/components/ui/Card'
+import MiniBarChart from '@/components/analytics/MiniBarChart'
+import AnalyticsSection, { StatCard, TrendBadge } from '@/components/analytics/AnalyticsSection'
 
 function dateStr(date: Date): string {
   return date.toISOString().split('T')[0]
@@ -121,7 +138,7 @@ interface Computed {
   lifeBestDay: { dayLabel: string; total: number } | null
   lifeWorstDay: { dayLabel: string; total: number } | null
   productivityTrend: number | null
-  healthTrend: number | null
+  healthTrendPct: number | null
   mindTrend: number | null
   bestProductivityDayAllTime: { date: string; score: number } | null
   bestHealthDayAllTime: { date: string; score: number } | null
@@ -129,6 +146,10 @@ interface Computed {
   hasData: boolean
   insights: string[]
   lifeInsights: string[]
+  sleep: SleepAnalytics
+  healthAnalytics: HealthTrendAnalytics
+  character: CharacterAnalytics
+  finance: FinanceAnalytics
 }
 
 export default function AnalyticsPage() {
@@ -139,6 +160,16 @@ export default function AnalyticsPage() {
     const entries = getEntries()
     const healthEntries = getHealthEntries()
     const journalEntries = getJournalEntries()
+    const sleepEntries = getSleepEntries()
+    const healthEvents = getHealthEvents()
+    const characterAreas = getCharacterAreas()
+    const financeAssets = getAssets()
+    const watchlistAssets = getWatchlistAssets()
+
+    const sleep = computeSleepAnalytics(sleepEntries)
+    const healthAnalytics = computeHealthTrendAnalytics(healthEntries, healthEvents)
+    const character = computeCharacterAnalytics(characterAreas)
+    const finance = computeFinanceAnalytics(financeAssets, watchlistAssets)
 
     const today = new Date()
     const dayOfWeek = today.getDay()
@@ -379,7 +410,7 @@ export default function AnalyticsPage() {
       : null
     const thisAvgHealth = healthAvgs.length > 0 ? healthAvgs.reduce((s, v) => s + v, 0) / healthAvgs.length : 0
     const prevAvgHealth = prevHealthAvgs.length > 0 ? prevHealthAvgs.reduce((s, v) => s + v, 0) / prevHealthAvgs.length : 0
-    const healthTrend = prevAvgHealth > 0
+    const healthTrendPct = prevAvgHealth > 0
       ? Math.round(((thisAvgHealth - prevAvgHealth) / prevAvgHealth) * 100)
       : null
     const thisAvgMind = mindAvgs.reduce((s, v) => s + v, 0) / mindAvgs.length
@@ -404,7 +435,9 @@ export default function AnalyticsPage() {
       lifeInsights.push(`Weakest category: ${withScores[withScores.length - 1].label} (${withScores[withScores.length - 1].score}/100)`)
     }
 
-    const hasData = sessions.length > 0 || workItems.length > 0 || habits.length > 0 || healthEntries.length > 0 || journalEntries.length > 0
+    const hasData = sessions.length > 0 || workItems.length > 0 || habits.length > 0
+      || healthEntries.length > 0 || journalEntries.length > 0 || sleepEntries.length > 0
+      || characterAreas.length > 0 || financeAssets.length > 0 || watchlistAssets.length > 0
 
     return {
       weekDays,
@@ -445,7 +478,7 @@ export default function AnalyticsPage() {
       lifeBestDay,
       lifeWorstDay,
       productivityTrend,
-      healthTrend,
+      healthTrendPct,
       mindTrend,
       bestProductivityDayAllTime,
       bestHealthDayAllTime,
@@ -453,6 +486,10 @@ export default function AnalyticsPage() {
       hasData,
       insights: insights.slice(0, 5),
       lifeInsights,
+      sleep,
+      healthAnalytics,
+      character,
+      finance,
     }
   }, [])
 
@@ -461,7 +498,7 @@ export default function AnalyticsPage() {
       <div className="space-y-10">
         <div className="space-y-2">
           <h1 className="text-4xl font-bold tracking-tight">Analytics</h1>
-          <p className="text-gray-500">Your performance dashboard</p>
+          <p className="text-gray-500">Complete Life OS overview — productivity, health, sleep, character &amp; finance</p>
         </div>
         <Card>
           <p className="text-gray-400 py-8 text-center">No data yet. Start using the app to see your analytics.</p>
@@ -474,218 +511,14 @@ export default function AnalyticsPage() {
     <div className="space-y-10">
       <div className="space-y-2">
         <h1 className="text-4xl font-bold tracking-tight">Analytics</h1>
-        <p className="text-gray-500">Your performance dashboard</p>
+        <p className="text-gray-500">Complete Life OS overview — productivity, health, sleep, character &amp; finance</p>
       </div>
 
       <section>
-        <h2 className="text-lg font-semibold mb-4">Weekly Overview</h2>
-        <div className="grid gap-3 sm:grid-cols-7">
-          {c.weekDays.map((d) => (
-            <Card key={d.date} className="p-4 text-center">
-              <p className="text-xs font-medium uppercase tracking-wider text-gray-400 mb-2">{d.dayLabel}</p>
-              <p className={`text-2xl font-bold ${d.score >= 70 ? 'text-green-600' : d.score >= 40 ? 'text-yellow-600' : 'text-red-500'}`}>{d.score}</p>
-              <p className="text-xs text-gray-400 mt-1">score</p>
-              <p className="text-sm font-medium text-gray-700 mt-2">{minsStr(d.focusMinutes)}</p>
-              <p className="text-xs text-gray-400">focus</p>
-              <p className="text-sm font-medium text-gray-700 mt-1">{d.tasksCompleted}</p>
-              <p className="text-xs text-gray-400">tasks</p>
-            </Card>
-          ))}
+        <div className="mb-4">
+          <h2 className="text-sm font-semibold uppercase tracking-widest text-gray-400">Life Overview</h2>
+          <p className="text-sm text-gray-500 mt-0.5">Weekly Life Score trend</p>
         </div>
-        <div className="grid gap-3 sm:grid-cols-3 mt-3">
-          <Card className="p-3 text-center">
-            <p className="text-xs text-gray-400">Weekly Average</p>
-            <p className="text-xl font-bold text-gray-900">{c.weeklyAvgScore}<span className="text-sm font-normal text-gray-400">/100</span></p>
-          </Card>
-          <Card className="p-3 text-center">
-            <p className="text-xs text-gray-400">Total Focus</p>
-            <p className="text-xl font-bold text-gray-900">{minsStr(c.totalFocusMinutes)}</p>
-          </Card>
-          <Card className="p-3 text-center">
-            <p className="text-xs text-gray-400">Tasks Done</p>
-            <p className="text-xl font-bold text-gray-900">{c.totalTasks}</p>
-          </Card>
-        </div>
-      </section>
-
-      <section>
-        <h2 className="text-lg font-semibold mb-4">Productivity Trend</h2>
-        <div className="grid gap-4 sm:grid-cols-3">
-          {c.bestDay && (
-            <Card className="p-4">
-              <p className="text-xs font-medium uppercase tracking-wider text-green-600 mb-1">Best Day</p>
-              <p className="text-lg font-bold text-gray-900">{c.bestDay.dayLabel}</p>
-              <p className="text-sm text-gray-500">Score: {c.bestDay.score} · Focus: {minsStr(c.bestDay.focusMinutes)} · Tasks: {c.bestDay.tasksCompleted}</p>
-            </Card>
-          )}
-          {c.worstDay && c.worstDay !== c.bestDay && (
-            <Card className="p-4">
-              <p className="text-xs font-medium uppercase tracking-wider text-red-500 mb-1">Lowest Day</p>
-              <p className="text-lg font-bold text-gray-900">{c.worstDay.dayLabel}</p>
-              <p className="text-sm text-gray-500">Score: {c.worstDay.score} · Focus: {minsStr(c.worstDay.focusMinutes)} · Tasks: {c.worstDay.tasksCompleted}</p>
-            </Card>
-          )}
-          {c.mostFocusedDay && (
-            <Card className="p-4">
-              <p className="text-xs font-medium uppercase tracking-wider text-blue-600 mb-1">Most Focused</p>
-              <p className="text-lg font-bold text-gray-900">{c.mostFocusedDay.dayLabel}</p>
-              <p className="text-sm text-gray-500">{minsStr(c.mostFocusedDay.focusMinutes)} of focus · {c.mostFocusedDay.tasksCompleted} tasks</p>
-            </Card>
-          )}
-        </div>
-      </section>
-
-      <section>
-        <h2 className="text-lg font-semibold mb-4">Focus Analytics</h2>
-        <div className="grid gap-4 sm:grid-cols-4">
-          <Card className="p-4">
-            <p className="text-xs text-gray-400">Total Focus Time</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">{minsStr(c.totalFocusMinutes)}</p>
-          </Card>
-          <Card className="p-4">
-            <p className="text-xs text-gray-400">Avg Session</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">{c.avgSessionMinutes}<span className="text-sm font-normal text-gray-400"> min</span></p>
-          </Card>
-          <Card className="p-4">
-            <p className="text-xs text-gray-400">Sessions</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">{c.focusSessions}</p>
-          </Card>
-          <Card className="p-4">
-            <p className="text-xs text-gray-400">Longest Session</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">{c.longestSessionMs > 0 ? minsStr(Math.round(c.longestSessionMs / 60000)) : '-'}</p>
-            {c.longestSessionDate && <p className="text-xs text-gray-400 mt-0.5">{c.longestSessionDate}</p>}
-          </Card>
-        </div>
-      </section>
-
-      <section>
-        <h2 className="text-lg font-semibold mb-4">Work Analytics</h2>
-        <div className="grid gap-4 sm:grid-cols-4">
-          <Card className="p-4">
-            <p className="text-xs text-gray-400">Active Singles</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">{c.activeSingles}</p>
-          </Card>
-          <Card className="p-4">
-            <p className="text-xs text-gray-400">Completed</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">{c.completedSingles}</p>
-          </Card>
-          <Card className="p-4">
-            <p className="text-xs text-gray-400">Completion Rate</p>
-            <p className={`text-2xl font-bold mt-1 ${c.completionRate >= 70 ? 'text-green-600' : c.completionRate >= 40 ? 'text-yellow-600' : 'text-red-500'}`}>{c.completionRate}<span className="text-sm font-normal text-gray-400">%</span></p>
-          </Card>
-          {c.totalGroups > 0 && (
-            <Card className="p-4">
-              <p className="text-xs text-gray-400">Group Progress</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{c.avgGroupProgress}<span className="text-sm font-normal text-gray-400">%</span></p>
-              <p className="text-xs text-gray-400 mt-0.5">{c.totalGroups} groups</p>
-            </Card>
-          )}
-        </div>
-      </section>
-
-      <section>
-        <h2 className="text-lg font-semibold mb-4">Habit Analytics</h2>
-        <div className="grid gap-4 sm:grid-cols-4">
-          <Card className="p-4">
-            <p className="text-xs text-gray-400">Build Habits Today</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">{c.habitBuildDone}<span className="text-sm font-normal text-gray-400">/{c.habitBuildTotal}</span></p>
-          </Card>
-          {c.habitAvoidTotal > 0 && (
-            <Card className="p-4">
-              <p className="text-xs text-gray-400">Avoid Habits</p>
-              <p className="text-2xl font-bold text-green-600 mt-1">{c.habitAvoidSuccess}<span className="text-sm font-normal text-gray-400">/{c.habitAvoidTotal} avoided</span></p>
-            </Card>
-          )}
-          <Card className="p-4">
-            <p className="text-xs text-gray-400">Current Streak</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">{c.habitCurrentStreak}<span className="text-sm font-normal text-gray-400"> days</span></p>
-          </Card>
-          <Card className="p-4">
-            <p className="text-xs text-gray-400">Longest Streak</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">{c.habitLongestStreak}<span className="text-sm font-normal text-gray-400"> days</span></p>
-          </Card>
-        </div>
-      </section>
-
-      {c.avgHealthTotal != null && (
-        <section>
-          <h2 className="text-lg font-semibold mb-4">Health Analytics</h2>
-          <div className="grid gap-4 sm:grid-cols-5">
-            <Card className="p-4">
-              <p className="text-xs text-gray-400">Avg Health Score</p>
-              <p className={`text-2xl font-bold mt-1 ${c.avgHealthTotal >= 60 ? 'text-green-600' : c.avgHealthTotal >= 40 ? 'text-yellow-600' : 'text-red-500'}`}>{c.avgHealthTotal}<span className="text-sm font-normal text-gray-400">/100</span></p>
-            </Card>
-            <Card className="p-4">
-              <p className="text-xs text-gray-400">Avg Steps</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{c.avgSteps?.toLocaleString() ?? '-'}</p>
-            </Card>
-            <Card className="p-4">
-              <p className="text-xs text-gray-400">Avg Water</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{c.avgWater ?? '-'}<span className="text-sm font-normal text-gray-400"> L</span></p>
-            </Card>
-            <Card className="p-4">
-              <p className="text-xs text-gray-400">Avg Workout</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{c.avgWorkout ?? '-'}<span className="text-sm font-normal text-gray-400"> min</span></p>
-            </Card>
-            <Card className="p-4">
-              <p className="text-xs text-gray-400">Avg Nutrition</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{c.avgNutrition ?? '-'}<span className="text-sm font-normal text-gray-400">/10</span></p>
-            </Card>
-          </div>
-          {c.bestHealthDay && (
-            <p className="text-sm text-gray-500 mt-2">Best health day: {c.bestHealthDay.date} (score: {c.bestHealthDay.score})</p>
-          )}
-        </section>
-      )}
-
-      <section>
-        <h2 className="text-lg font-semibold mb-4">Journal Analytics</h2>
-        <div className="grid gap-4 sm:grid-cols-5">
-          <Card className="p-4">
-            <p className="text-xs text-gray-400">Days Journaled</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">{c.journalDaysThisWeek}<span className="text-sm font-normal text-gray-400">/7</span></p>
-          </Card>
-          {c.avgMood != null && (
-            <Card className="p-4">
-              <p className="text-xs text-gray-400">Avg Mood</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{c.avgMood}<span className="text-sm font-normal text-gray-400">/10</span></p>
-            </Card>
-          )}
-          {c.avgEnergy != null && (
-            <Card className="p-4">
-              <p className="text-xs text-gray-400">Avg Energy</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{c.avgEnergy}<span className="text-sm font-normal text-gray-400">/10</span></p>
-            </Card>
-          )}
-          <Card className="p-4">
-            <p className="text-xs text-gray-400">Current Streak</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">{c.journalCurrentStreak}<span className="text-sm font-normal text-gray-400"> days</span></p>
-          </Card>
-          <Card className="p-4">
-            <p className="text-xs text-gray-400">Longest Streak</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">{c.journalLongestStreak}<span className="text-sm font-normal text-gray-400"> days</span></p>
-          </Card>
-        </div>
-      </section>
-
-      {c.insights.length > 0 && (
-        <section>
-          <h2 className="text-lg font-semibold mb-4">Insights</h2>
-          <Card className="p-5">
-            <ul className="space-y-2">
-              {c.insights.map((insight, i) => (
-                <li key={i} className="flex items-start gap-2 text-gray-700">
-                  <span className="text-blue-500 mt-0.5 shrink-0">•</span>
-                  <span>{insight}</span>
-                </li>
-              ))}
-            </ul>
-          </Card>
-        </section>
-      )}
-
-      <section>
-        <h2 className="text-lg font-semibold mb-4">Life Analytics</h2>
         <div className="grid gap-3 sm:grid-cols-7 mb-4">
           {c.lifeWeekScores.map((d) => (
             <Card key={d.date} className="p-3 text-center">
@@ -695,63 +528,19 @@ export default function AnalyticsPage() {
             </Card>
           ))}
         </div>
-        <div className="grid gap-4 sm:grid-cols-3 mb-4">
-          <Card className="p-4 text-center">
-            <p className="text-xs text-gray-400">Weekly Average</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">{c.lifeWeeklyAvg}<span className="text-sm font-normal text-gray-400">/100</span></p>
-          </Card>
-          {c.lifeBestDay && (
-            <Card className="p-4 text-center">
-              <p className="text-xs text-gray-400">Best Day</p>
-              <p className="text-2xl font-bold text-green-600 mt-1">{c.lifeBestDay.total}</p>
-              <p className="text-sm text-gray-500">{c.lifeBestDay.dayLabel}</p>
-            </Card>
-          )}
+        <div className="grid gap-4 sm:grid-cols-4 mb-4">
+          <StatCard label="Weekly Average" value={`${c.lifeWeeklyAvg}/100`} />
+          {c.lifeBestDay && <StatCard label="Best Day" value={String(c.lifeBestDay.total)} sublabel={c.lifeBestDay.dayLabel} valueClassName="text-green-600" />}
           {c.lifeWorstDay && c.lifeWorstDay.dayLabel !== c.lifeBestDay?.dayLabel && (
-            <Card className="p-4 text-center">
-              <p className="text-xs text-gray-400">Worst Day</p>
-              <p className="text-2xl font-bold text-red-500 mt-1">{c.lifeWorstDay.total}</p>
-              <p className="text-sm text-gray-500">{c.lifeWorstDay.dayLabel}</p>
-            </Card>
+            <StatCard label="Lowest Day" value={String(c.lifeWorstDay.total)} sublabel={c.lifeWorstDay.dayLabel} valueClassName="text-red-500" />
           )}
-        </div>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Card className="p-4">
-            <p className="text-xs text-gray-400">Productivity Trend</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">
-              {c.productivityTrend != null ? (
-                <span className={c.productivityTrend > 0 ? 'text-green-600' : c.productivityTrend < 0 ? 'text-red-500' : 'text-gray-900'}>
-                  {c.productivityTrend > 0 ? '↑' : c.productivityTrend < 0 ? '↓' : '→'} {Math.abs(c.productivityTrend)}%
-                </span>
-              ) : '—'}
-            </p>
-          </Card>
-          <Card className="p-4">
-            <p className="text-xs text-gray-400">Health Trend</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">
-              {c.healthTrend != null ? (
-                <span className={c.healthTrend > 0 ? 'text-green-600' : c.healthTrend < 0 ? 'text-red-500' : 'text-gray-900'}>
-                  {c.healthTrend > 0 ? '↑' : c.healthTrend < 0 ? '↓' : '→'} {Math.abs(c.healthTrend)}%
-                </span>
-              ) : '—'}
-            </p>
-          </Card>
-          <Card className="p-4">
-            <p className="text-xs text-gray-400">Mind Trend</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">
-              {c.mindTrend != null ? (
-                <span className={c.mindTrend > 0 ? 'text-green-600' : c.mindTrend < 0 ? 'text-red-500' : 'text-gray-900'}>
-                  {c.mindTrend > 0 ? '↑' : c.mindTrend < 0 ? '↓' : '→'} {Math.abs(c.mindTrend)}%
-                </span>
-              ) : '—'}
-            </p>
-          </Card>
+          <StatCard label="Mind Trend" value={c.mindTrend != null ? `${c.mindTrend > 0 ? '+' : ''}${c.mindTrend}%` : '—'} trend={c.mindTrend} />
         </div>
         {c.lifeInsights.length > 0 && (
-          <Card className="p-4 mt-4">
+          <Card className="p-4">
             <ul className="space-y-1.5">
-              {c.lifeInsights.map((insight, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+              {c.lifeInsights.map((insight) => (
+                <li key={insight} className="flex items-start gap-2 text-sm text-gray-700">
                   <span className="text-blue-500 mt-0.5 shrink-0">•</span>
                   <span>{insight}</span>
                 </li>
@@ -761,48 +550,222 @@ export default function AnalyticsPage() {
         )}
       </section>
 
-      <section>
-        <h2 className="text-lg font-semibold mb-4">Top Performances</h2>
-        <div className="grid gap-4 sm:grid-cols-4">
+      <AnalyticsSection title="Productivity Analytics" subtitle="Weekly performance, focus & work output">
+        <div className="grid gap-3 sm:grid-cols-7 mb-3">
+          {c.weekDays.map((d) => (
+            <Card key={d.date} className="p-3 text-center">
+              <p className="text-[10px] font-medium uppercase tracking-wider text-gray-400 mb-1">{d.dayLabel}</p>
+              <p className={`text-xl font-bold tabular-nums ${d.score >= 70 ? 'text-green-600' : d.score >= 40 ? 'text-yellow-600' : 'text-red-500'}`}>{d.score}</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">{minsStr(d.focusMinutes)} focus</p>
+              <p className="text-[10px] text-gray-400">{d.tasksCompleted} tasks</p>
+            </Card>
+          ))}
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-3">
+          <StatCard label="Weekly Avg Score" value={`${c.weeklyAvgScore}/100`} />
+          <StatCard label="Total Focus" value={minsStr(c.totalFocusMinutes)} />
+          <StatCard label="Tasks Done" value={String(c.totalTasks)} />
+          <StatCard label="Completion Rate" value={`${c.completionRate}%`} valueClassName={c.completionRate >= 70 ? 'text-green-600' : c.completionRate >= 40 ? 'text-yellow-600' : 'text-red-500'} />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard label="Focus Sessions" value={String(c.focusSessions)} sublabel={`Avg ${c.avgSessionMinutes} min`} />
+          <StatCard label="Longest Session" value={c.longestSessionMs > 0 ? minsStr(Math.round(c.longestSessionMs / 60000)) : '—'} sublabel={c.longestSessionDate || undefined} />
+          <StatCard label="Build Habits Today" value={`${c.habitBuildDone}/${c.habitBuildTotal}`} />
+          <StatCard label="Habit Streak" value={`${c.habitCurrentStreak} days`} sublabel={`Best: ${c.habitLongestStreak} days`} />
+        </div>
+        {(c.bestDay || c.mostFocusedDay) && (
+          <div className="grid gap-3 sm:grid-cols-3 mt-3">
+            {c.bestDay && (
+              <Card className="p-4">
+                <p className="text-[10px] font-medium uppercase tracking-wider text-green-600 mb-1">Best Day</p>
+                <p className="text-lg font-bold text-gray-900">{c.bestDay.dayLabel}</p>
+                <p className="text-sm text-gray-500">Score {c.bestDay.score} · {minsStr(c.bestDay.focusMinutes)} focus</p>
+              </Card>
+            )}
+            {c.mostFocusedDay && (
+              <Card className="p-4">
+                <p className="text-[10px] font-medium uppercase tracking-wider text-blue-600 mb-1">Most Focused</p>
+                <p className="text-lg font-bold text-gray-900">{c.mostFocusedDay.dayLabel}</p>
+                <p className="text-sm text-gray-500">{minsStr(c.mostFocusedDay.focusMinutes)} of deep work</p>
+              </Card>
+            )}
+            {c.worstDay && c.worstDay !== c.bestDay && (
+              <Card className="p-4">
+                <p className="text-[10px] font-medium uppercase tracking-wider text-red-500 mb-1">Lowest Day</p>
+                <p className="text-lg font-bold text-gray-900">{c.worstDay.dayLabel}</p>
+                <p className="text-sm text-gray-500">Score {c.worstDay.score}</p>
+              </Card>
+            )}
+          </div>
+        )}
+      </AnalyticsSection>
+
+      <AnalyticsSection title="Sleep Analytics" subtitle="Sleep quality, duration & stage trends" hasData={c.sleep.hasData} emptyMessage="No sleep data yet. Log sleep in Life OS." insights={c.sleep.insights}>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-3">
+          <StatCard label="Avg Sleep Score" value={c.sleep.avgScore != null ? `${c.sleep.avgScore}/100` : '—'} />
+          <StatCard label="Avg Duration" value={c.sleep.avgDurationMinutes != null ? formatDuration(Math.round(c.sleep.avgDurationMinutes)) : '—'} />
+          <StatCard label="Week vs Month" value={formatPct(c.sleep.weekVsMonthPct)} sublabel={`Week ${c.sleep.weekAvgScore ?? '—'} · Month ${c.sleep.monthAvgScore ?? '—'}`} />
+          <StatCard label="Avg REM / Deep" value={c.sleep.avgRemPct != null ? `${c.sleep.avgRemPct}% / ${c.sleep.avgDeepPct}%` : '—'} />
+        </div>
+        <div className="grid gap-3 lg:grid-cols-3">
           <Card className="p-4">
-            <p className="text-xs font-medium uppercase tracking-wider text-green-600 mb-1">Best Productivity Day</p>
+            <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400 mb-3">Sleep Score (7 days)</p>
+            <MiniBarChart data={c.sleep.weekTrend.map((p) => ({ label: p.label, value: p.value }))} max={100} />
+          </Card>
+          <Card className="p-4">
+            <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400 mb-3">REM % (<TrendBadge value={c.sleep.remTrendPct} />)</p>
+            <MiniBarChart data={c.sleep.remWeekTrend.map((p) => ({ label: p.label, value: p.value }))} max={40} unit="%" colorClass="bg-indigo-500" />
+          </Card>
+          <Card className="p-4">
+            <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400 mb-3">Deep Sleep % (<TrendBadge value={c.sleep.deepTrendPct} />)</p>
+            <MiniBarChart data={c.sleep.deepWeekTrend.map((p) => ({ label: p.label, value: p.value }))} max={30} unit="%" colorClass="bg-violet-600" />
+          </Card>
+        </div>
+      </AnalyticsSection>
+
+      <AnalyticsSection title="Health Analytics" subtitle="Health score, wellness trends & illness tracking" hasData={c.healthAnalytics.hasData} emptyMessage="No health data yet. Log health in Life OS." insights={c.healthAnalytics.insights}>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-3">
+          <StatCard label="Avg Health Score" value={c.healthAnalytics.avgScore != null ? `${c.healthAnalytics.avgScore}/100` : '—'} trend={c.healthAnalytics.scoreTrendPct} valueClassName={c.healthAnalytics.avgScore != null && c.healthAnalytics.avgScore >= 60 ? 'text-green-600' : 'text-gray-900'} />
+          <StatCard label="Days Without Illness" value={c.healthAnalytics.isSick ? '0' : String(c.healthAnalytics.daysWithoutIllness)} sublabel={c.healthAnalytics.isSick ? 'Currently sick' : 'Healthy streak'} valueClassName={c.healthAnalytics.isSick ? 'text-red-500' : 'text-green-600'} />
+          <StatCard label="Avg Steps" value={c.avgSteps?.toLocaleString() ?? '—'} sublabel="This week" />
+          <StatCard label="Avg Water" value={c.avgWater != null ? `${c.avgWater} L` : '—'} sublabel="This week" />
+        </div>
+        <div className="grid gap-3 lg:grid-cols-2">
+          <Card className="p-4">
+            <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400 mb-3">Health Score Trend</p>
+            <MiniBarChart data={c.healthAnalytics.weekScores.map((p) => ({ label: p.label, value: p.value }))} max={100} colorClass="bg-green-600" />
+          </Card>
+          <Card className="p-4">
+            <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400 mb-3">Water Intake (L)</p>
+            <MiniBarChart data={c.healthAnalytics.waterTrend.map((p) => ({ label: p.label, value: p.value }))} max={3} colorClass="bg-blue-500" />
+          </Card>
+          <Card className="p-4">
+            <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400 mb-3">Exercise (min)</p>
+            <MiniBarChart data={c.healthAnalytics.exerciseTrend.map((p) => ({ label: p.label, value: p.value }))} max={60} colorClass="bg-orange-500" />
+          </Card>
+          <Card className="p-4">
+            <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400 mb-3">Healthy Eating (/10)</p>
+            <MiniBarChart data={c.healthAnalytics.nutritionTrend.map((p) => ({ label: p.label, value: p.value }))} max={10} colorClass="bg-emerald-600" />
+          </Card>
+        </div>
+      </AnalyticsSection>
+
+      <AnalyticsSection title="Character Analytics" subtitle="Personal development & trait progression" hasData={c.character.hasData} emptyMessage="No character traits yet. Add traits in Life OS." insights={c.character.insights}>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-3">
+          {c.character.bestImproving && <StatCard label="Strongest Trait" value={c.character.bestImproving.name} sublabel={`Level ${c.character.bestImproving.level}/10`} valueClassName="text-green-600" />}
+          {c.character.weakest && <StatCard label="Weakest Trait" value={c.character.weakest.name} sublabel={`Level ${c.character.weakest.level}/10`} valueClassName="text-amber-600" />}
+          <StatCard label="Monthly Growth" value={`+${c.character.monthlyGrowth}`} sublabel="Levels gained from baseline" />
+          <StatCard label="Updated This Month" value={String(c.character.traitsUpdatedThisMonth)} sublabel={`${c.character.traits.length} active traits`} />
+        </div>
+        <Card className="p-4">
+          <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400 mb-4">Trait Progression</p>
+          <div className="space-y-3">
+            {[...c.character.traits].sort((a, b) => b.level - a.level).map((trait) => (
+              <div key={trait.name}>
+                <div className="flex items-center justify-between text-sm mb-1">
+                  <span className="text-gray-700">{trait.name}</span>
+                  <span className="font-medium text-gray-900 tabular-nums">{trait.level}/10</span>
+                </div>
+                <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                  <div className="h-full rounded-full bg-gray-900 transition-all duration-500" style={{ width: `${(trait.level / 10) * 100}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </AnalyticsSection>
+
+      <AnalyticsSection title="Finance Analytics" subtitle="Portfolio & watchlist performance" hasData={c.finance.hasData} emptyMessage="No finance data yet. Add stocks in Life OS." insights={c.finance.insights}>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-3">
+          <StatCard label="Portfolio Today" value={`${c.finance.portfolioDailyPct >= 0 ? '+' : ''}${c.finance.portfolioDailyPct.toFixed(2)}%`} valueClassName={c.finance.portfolioDailyPct >= 0 ? 'text-green-600' : 'text-red-500'} />
+          <StatCard label="Portfolio Week" value={`${c.finance.portfolioWeekPct >= 0 ? '+' : ''}${c.finance.portfolioWeekPct.toFixed(2)}%`} />
+          <StatCard label="Portfolio Month" value={`${c.finance.portfolioMonthPct >= 0 ? '+' : ''}${c.finance.portfolioMonthPct.toFixed(2)}%`} />
+          <StatCard label="Watchlist Today" value={`${c.finance.watchlistDailyPct >= 0 ? '+' : ''}${c.finance.watchlistDailyPct.toFixed(2)}%`} sublabel={`${c.finance.portfolioCount} held · ${c.finance.watchlistCount} watching`} />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {c.finance.bestPerformer && (
+            <Card className="p-4">
+              <p className="text-[10px] font-medium uppercase tracking-wider text-green-600 mb-1">Best Performer Today</p>
+              <p className="text-lg font-bold text-gray-900">{c.finance.bestPerformer.symbol}</p>
+              <p className="text-sm text-green-600 tabular-nums">{c.finance.bestPerformer.pct >= 0 ? '+' : ''}{c.finance.bestPerformer.pct.toFixed(2)}%</p>
+            </Card>
+          )}
+          {c.finance.worstPerformer && (
+            <Card className="p-4">
+              <p className="text-[10px] font-medium uppercase tracking-wider text-red-500 mb-1">Worst Performer Today</p>
+              <p className="text-lg font-bold text-gray-900">{c.finance.worstPerformer.symbol}</p>
+              <p className={`text-sm tabular-nums ${c.finance.worstPerformer.pct >= 0 ? 'text-green-600' : 'text-red-500'}`}>{c.finance.worstPerformer.pct >= 0 ? '+' : ''}{c.finance.worstPerformer.pct.toFixed(2)}%</p>
+            </Card>
+          )}
+        </div>
+        {c.finance.portfolioTrend.length > 0 && (
+          <Card className="p-4 mt-3">
+            <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400 mb-3">Portfolio Price Trend (7 days)</p>
+            <MiniBarChart data={c.finance.portfolioTrend.map((p, i) => ({ label: i === c.finance.portfolioTrend.length - 1 ? 'Now' : p.label, value: p.value }))} colorClass="bg-green-600" />
+          </Card>
+        )}
+      </AnalyticsSection>
+
+      <AnalyticsSection title="Journal Analytics" subtitle="Reflection & mindfulness">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <StatCard label="Days Journaled" value={`${c.journalDaysThisWeek}/7`} />
+          {c.avgMood != null && <StatCard label="Avg Mood" value={`${c.avgMood}/10`} />}
+          {c.avgEnergy != null && <StatCard label="Avg Energy" value={`${c.avgEnergy}/10`} />}
+          <StatCard label="Current Streak" value={`${c.journalCurrentStreak} days`} />
+          <StatCard label="Longest Streak" value={`${c.journalLongestStreak} days`} />
+        </div>
+      </AnalyticsSection>
+
+      {c.insights.length > 0 && (
+        <AnalyticsSection title="Productivity Insights">
+          <Card className="p-5">
+            <ul className="space-y-2">
+              {c.insights.map((insight) => (
+                <li key={insight} className="flex items-start gap-2 text-gray-700">
+                  <span className="text-blue-500 mt-0.5 shrink-0">•</span>
+                  <span>{insight}</span>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        </AnalyticsSection>
+      )}
+
+      <AnalyticsSection title="Top Performances" subtitle="All-time highlights">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Card className="p-4">
+            <p className="text-[10px] font-medium uppercase tracking-wider text-green-600 mb-1">Best Productivity Day</p>
             {c.bestProductivityDayAllTime ? (
               <>
                 <p className="text-lg font-bold text-gray-900">{c.bestProductivityDayAllTime.date}</p>
                 <p className="text-sm text-gray-500">Score: {c.bestProductivityDayAllTime.score}</p>
               </>
-            ) : (
-              <p className="text-sm text-gray-400">No data</p>
-            )}
+            ) : <p className="text-sm text-gray-400">No data</p>}
           </Card>
           <Card className="p-4">
-            <p className="text-xs font-medium uppercase tracking-wider text-blue-600 mb-1">Longest Focus Session</p>
+            <p className="text-[10px] font-medium uppercase tracking-wider text-blue-600 mb-1">Longest Focus Session</p>
             {c.longFocusSessionAllTime && c.longFocusSessionAllTime.durationMs > 0 ? (
               <>
                 <p className="text-lg font-bold text-gray-900">{minsStr(Math.round(c.longFocusSessionAllTime.durationMs / 60000))}</p>
                 <p className="text-sm text-gray-500">{c.longFocusSessionAllTime.date}</p>
               </>
-            ) : (
-              <p className="text-sm text-gray-400">No data</p>
-            )}
+            ) : <p className="text-sm text-gray-400">No data</p>}
           </Card>
           <Card className="p-4">
-            <p className="text-xs font-medium uppercase tracking-wider text-purple-600 mb-1">Longest Habit Streak</p>
+            <p className="text-[10px] font-medium uppercase tracking-wider text-purple-600 mb-1">Longest Habit Streak</p>
             <p className="text-lg font-bold text-gray-900">{c.habitLongestStreak}<span className="text-sm font-normal text-gray-400"> days</span></p>
           </Card>
           <Card className="p-4">
-            <p className="text-xs font-medium uppercase tracking-wider text-yellow-600 mb-1">Best Health Day</p>
+            <p className="text-[10px] font-medium uppercase tracking-wider text-yellow-600 mb-1">Best Health Day</p>
             {c.bestHealthDayAllTime ? (
               <>
                 <p className="text-lg font-bold text-gray-900">{c.bestHealthDayAllTime.date}</p>
                 <p className="text-sm text-gray-500">Score: {c.bestHealthDayAllTime.score}</p>
               </>
-            ) : (
-              <p className="text-sm text-gray-400">No data</p>
-            )}
+            ) : <p className="text-sm text-gray-400">No data</p>}
           </Card>
         </div>
-      </section>
+      </AnalyticsSection>
     </div>
   )
 }

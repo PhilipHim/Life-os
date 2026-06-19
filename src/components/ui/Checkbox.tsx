@@ -4,20 +4,22 @@ interface CheckboxProps {
   checked: boolean
   onChange: () => void
   className?: string
+  disabled?: boolean
 }
 
-export default function Checkbox({ checked, onChange, className = '' }: CheckboxProps) {
+export default function Checkbox({ checked, onChange, className = '', disabled = false }: CheckboxProps) {
   return (
     <button
       type="button"
       role="checkbox"
       aria-checked={checked}
-      onClick={onChange}
+      disabled={disabled}
+      onClick={disabled ? undefined : onChange}
       className={`relative size-6 shrink-0 rounded-md border-2 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 ${
         checked
           ? 'border-gray-900 bg-gray-900'
           : 'border-gray-300 hover:border-gray-400'
-      } ${className}`}
+      } ${disabled ? 'opacity-40 cursor-not-allowed' : ''} ${className}`}
     >
       <svg
         viewBox="0 0 16 16"

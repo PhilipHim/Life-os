@@ -16,6 +16,7 @@ import { getBusinessIdeas, saveBusinessIdea, deleteBusinessIdea, IDEA_CATEGORIES
 import { getQuotes, saveQuote, deleteQuote } from '@/lib/db/quotes'
 import { getCharacterAreas, getAllCharacterAreas, setCharacterLevel, updateCharacterArea, deleteCharacterArea, restoreCharacterArea, permanentDeleteCharacterArea, saveCharacterArea } from '@/lib/db/character'
 import Card from '@/components/ui/Card'
+import ConvertIdeaToWorkModal from '@/components/ConvertIdeaToWorkModal'
 
 type Tab = 'journal' | 'sleep' | 'health' | 'finance' | 'ideas' | 'quotes' | 'character'
 
@@ -1148,6 +1149,7 @@ function IdeasSection() {
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<BusinessIdea | null>(null)
+  const [convertingIdea, setConvertingIdea] = useState<BusinessIdea | null>(null)
 
   useEffect(() => { setItems(getBusinessIdeas()) }, [])
 
@@ -1204,6 +1206,7 @@ function IdeasSection() {
           initial={editing ?? blankIdea()}
           onSave={handleSave}
           onDelete={editing ? () => handleDelete(editing.id) : undefined}
+          onConvert={editing ? (idea) => setConvertingIdea(idea) : undefined}
         />
       )}
 
@@ -1238,9 +1241,13 @@ function IdeasSection() {
                   <p className="text-gray-600 whitespace-pre-wrap">{item.notes}</p>
                 </div>
               )}
-              <div className="flex gap-2 pt-2">
+              <div className="flex gap-2 pt-2 flex-wrap">
                 <button onClick={() => { setEditing(item); setShowForm(true) }}
                   className="rounded px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors">Edit</button>
+                <button onClick={() => setConvertingIdea(item)}
+                  className="rounded px-2 py-1 text-xs font-medium text-gray-900 bg-gray-100 hover:bg-gray-200 transition-colors">
+                  Convert to Work Item
+                </button>
                 <button onClick={() => handleDelete(item.id)}
                   className="rounded px-2 py-1 text-xs font-medium text-red-500 hover:bg-red-50 transition-colors">Delete</button>
               </div>
@@ -1248,6 +1255,13 @@ function IdeasSection() {
           </details>
         ))}
       </div>
+
+      {convertingIdea && (
+        <ConvertIdeaToWorkModal
+          idea={convertingIdea}
+          onClose={() => setConvertingIdea(null)}
+        />
+      )}
     </div>
   )
 }
@@ -1265,8 +1279,8 @@ function blankIdea(): BusinessIdea {
   }
 }
 
-function IdeaForm({ initial, onSave, onDelete }: {
-  initial: BusinessIdea; onSave: (i: BusinessIdea) => void; onDelete?: () => void
+function IdeaForm({ initial, onSave, onDelete, onConvert }: {
+  initial: BusinessIdea; onSave: (i: BusinessIdea) => void; onDelete?: () => void; onConvert?: (i: BusinessIdea) => void
 }) {
   const [form, setForm] = useState(initial)
 
@@ -1306,9 +1320,15 @@ function IdeaForm({ initial, onSave, onDelete }: {
           <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={4}
             className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-900 resize-y focus:border-gray-400 focus:outline-none focus:ring-0" />
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <button onClick={handleSave}
             className="rounded-lg bg-gray-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-gray-800 transition-colors">Save</button>
+          {onConvert && form.title.trim() && (
+            <button type="button" onClick={() => onConvert(form)}
+              className="rounded-lg border border-gray-200 px-4 py-1.5 text-sm font-medium text-gray-900 hover:bg-gray-50 transition-colors">
+              Convert to Work Item
+            </button>
+          )}
           {onDelete && (
             <button onClick={onDelete}
               className="rounded-lg border border-red-200 px-4 py-1.5 text-sm font-medium text-red-500 hover:bg-red-50 transition-colors">Delete</button>

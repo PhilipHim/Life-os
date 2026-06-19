@@ -15,6 +15,7 @@ import { getRecurringTemplates } from '@/lib/recurring'
 interface WorkItemContextType {
   workItems: WorkItem[]
   addWorkItem: (title: string, type: 'single' | 'group', description?: string, childrenIds?: string[]) => void
+  createSingleWorkItem: (payload: { title: string; description: string; notes: string }) => string
   addRecurringWorkItem: (title: string, description: string, recurrenceType: 'daily' | 'weekly', daysOfWeek?: number[]) => void
   toggleWorkItem: (id: string) => void
   deleteWorkItem: (id: string) => void
@@ -61,6 +62,24 @@ export function WorkItemProvider({ children }: { children: ReactNode }) {
       completedAt: null,
     }
     setWorkItems(persistAdd(item))
+  }
+
+  const createSingleWorkItem = (payload: { title: string; description: string; notes: string }): string => {
+    const now = Date.now()
+    const item: WorkItem = {
+      id: crypto.randomUUID(),
+      type: 'single',
+      title: payload.title,
+      description: payload.description,
+      notes: payload.notes,
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
+      childrenIds: [],
+      completedAt: null,
+    }
+    setWorkItems(persistAdd(item))
+    return item.id
   }
 
   const addRecurringWorkItem = (title: string, description: string, recurrenceType: 'daily' | 'weekly', daysOfWeek?: number[]) => {
@@ -199,6 +218,7 @@ export function WorkItemProvider({ children }: { children: ReactNode }) {
       value={{
         workItems,
         addWorkItem,
+        createSingleWorkItem,
         addRecurringWorkItem,
         createGroupWithChildren,
         toggleWorkItem,

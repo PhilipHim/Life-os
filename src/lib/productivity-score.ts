@@ -1,4 +1,9 @@
 import type { DailyPlanItem, WorkItem, FocusSession } from '@/lib/types'
+import {
+  getRecurringTemplates,
+  computeTodayRecurringPlannerStats,
+  isRecurringWorkItemCompleted,
+} from '@/lib/recurring'
 
 const PRIORITY_WEIGHTS: Record<string, number> = { H1: 4, H2: 3, M: 2, L: 1 }
 
@@ -60,12 +65,19 @@ export function computeProductivityScore(
 ): ProductivityScore {
   const today = todayStr()
   const todayPlan = planItems.filter((pi) => pi.date === today)
+  const recurringTemplates = getRecurringTemplates(workItems)
+  const plannedTemplateIds = new Set(
+    todayPlan
+      .map((pi) => workItems.find((w) => w.id === pi.workItemId))
+      .filter((wi) => wi?.recurring && wi.isTemplate)
+      .map((wi) => wi!.id)
+  )
+  const recurringStats = computeTodayRecurringPlannerStats(recurringTemplates, plannedTemplateIds)
 
-  const plannerTotal = todayPlan.length
-  const plannerCompleted = todayPlan.filter((pi) => {
-    const wi = workItems.find((w) => w.id === pi.workItemId)
-    return wi?.status === 'completed'
-  }).length
+  const plannerTotal = todayPlan.length + recurringStats.total
+  const plannerCompleted =
+    todayPlan.filter((pi) => isRecurringWorkItemCompleted(pi.workItemId, workItems)).length +
+    recurringStats.completed
   const plannerPercentage = plannerTotal > 0 ? (plannerCompleted / plannerTotal) * 100 : 0
   const plannerScore = plannerTotal > 0 ? Math.round((plannerCompleted / plannerTotal) * 40) : 0
 
@@ -75,7 +87,7 @@ export function computeProductivityScore(
     const weight = PRIORITY_WEIGHTS[pi.priority] ?? 1
     totalWeight += weight
     const wi = workItems.find((w) => w.id === pi.workItemId)
-    if (wi?.status === 'completed') {
+    if (isRecurringWorkItemCompleted(pi.workItemId, workItems)) {
       completedWeight += weight
     }
   }
@@ -165,7 +177,7 @@ export function generateProductivityInsights(
 
   const h1Items = todayPlan.filter((pi) => pi.priority === 'H1')
   const h1Completed = h1Items.filter((pi) =>
-    workItems.find((w) => w.id === pi.workItemId)?.status === 'completed'
+    isRecurringWorkItemCompleted(pi.workItemId, workItems)
   ).length
 
   if (h1Items.length > 0 && h1Completed === h1Items.length) {
