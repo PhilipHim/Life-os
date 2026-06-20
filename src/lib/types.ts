@@ -123,6 +123,30 @@ export interface Asset {
 
 export type BusinessIdeaStatus = 'idea' | 'researching' | 'building' | 'testing' | 'launched' | 'archived'
 
+export type CompetitionLevel = 'Low' | 'Medium' | 'High'
+export type MvpTimeline = 'Very Fast' | 'Fast' | 'Medium' | 'Long'
+export type BusinessRiskType = 'Market risk' | 'Distribution risk' | 'Execution risk' | 'Technical risk'
+export type MonetizationModel =
+  | 'Subscription'
+  | 'One-time payment'
+  | 'Agency'
+  | 'Consulting'
+  | 'Affiliate'
+  | 'Marketplace'
+
+export interface BusinessIdeaAnalysis {
+  overallScore: number
+  marketPotential: { score: number; explanation: string }
+  monetization: { score: number; models: MonetizationModel[]; explanation: string }
+  difficulty: { score: number; technicalExplanation: string; operationalExplanation: string }
+  competition: { level: CompetitionLevel; explanation: string }
+  timeToMvp: { estimate: MvpTimeline; explanation: string }
+  biggestRisk: { type: BusinessRiskType; explanation: string }
+  nextStep: string
+  mvpRoadmap: string[]
+  analyzedAt: number
+}
+
 export interface BusinessIdea {
   id: string
   title: string
@@ -130,6 +154,8 @@ export interface BusinessIdea {
   category: string
   status: BusinessIdeaStatus
   notes: string
+  analysis?: BusinessIdeaAnalysis
+  analysisSource?: 'gemini' | 'rules'
   createdAt: number
   updatedAt: number
 }

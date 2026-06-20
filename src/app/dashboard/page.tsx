@@ -25,7 +25,9 @@ import {
   computeStockPerformance,
 } from '@/lib/db/finance'
 import type { CharacterArea, JournalEntry } from '@/lib/types'
+import { generateCoachReportAsync, type CoachReport } from '@/lib/coach'
 import Card from '@/components/ui/Card'
+import AICoachCard from '@/components/coach/AICoachCard'
 
 const PRIORITY_ORDER: Record<string, number> = { H1: 0, H2: 1, M: 2, L: 3 }
 
@@ -296,6 +298,52 @@ export default function DashboardPage() {
     return activeCount
   }, [characterAreas])
 
+  const [coachReport, setCoachReport] = useState<CoachReport | null>(null)
+  const [coachLoading, setCoachLoading] = useState(true)
+  const [coachSource, setCoachSource] = useState<'gemini' | 'rules'>('rules')
+  const [coachError, setCoachError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    const timer = setTimeout(() => {
+      setCoachLoading(true)
+      generateCoachReportAsync({
+        workItems,
+        planItems,
+        todayPlan,
+        focusSessions,
+        productivityScore,
+        lifeScore,
+        buildDone,
+        buildTotal,
+        avoidSuccess,
+        avoidTotal,
+        activeTaskTitle: dailyFocus.currentTask,
+        nextPriorityTaskTitle: dailyFocus.nextTaskTitle,
+      })
+        .then(({ report, source, error }) => {
+          if (cancelled) return
+          setCoachReport(report)
+          setCoachSource(source)
+          setCoachError(error ?? null)
+          setCoachLoading(false)
+        })
+        .catch(() => {
+          if (cancelled) return
+          setCoachLoading(false)
+        })
+    }, 600)
+
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [
+    workItems, planItems, todayPlan, focusSessions, productivityScore, lifeScore,
+    buildDone, buildTotal, avoidSuccess, avoidTotal,
+    dailyFocus.currentTask, dailyFocus.nextTaskTitle,
+  ])
+
   return (
     <div className="space-y-10">
       <div className="space-y-1">
@@ -353,6 +401,28 @@ export default function DashboardPage() {
           </Card>
         )}
       </div>
+
+      {/* AI Coach */}
+      {coachLoading && !coachReport && (
+        <Card className="p-8 text-center">
+          <p className="text-sm text-gray-500">AI Coach is analyzing your Life OS data…</p>
+        </Card>
+      )}
+      {coachReport && (
+        <>
+          {coachError && (
+            <Card className="border-amber-200 bg-amber-50 p-4">
+              <p className="text-sm text-amber-900">
+                <span className="font-semibold">Gemini unavailable — showing offline coach.</span>{' '}
+                {coachError.includes('429') || coachError.includes('quota')
+                  ? 'API quota exceeded. Wait a minute or set GEMINI_MODEL=gemini-2.5-flash in .env.local and restart the dev server.'
+                  : coachError}
+              </p>
+            </Card>
+          )}
+          <AICoachCard report={coachReport} loading={coachLoading} poweredByGemini={coachSource === 'gemini'} />
+        </>
+      )}
 
       {/* SECTION 2: Today Overview */}
       <div>

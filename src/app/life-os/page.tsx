@@ -13,6 +13,10 @@ import { getHealthEvents, saveHealthEvent, deleteHealthEvent, computeHealthStatu
 import { computeHealthScore, getHealthRating } from '@/lib/health-score'
 import { getAssets, addStock, deleteAsset, computeAggregatedPerformance, computeStockPerformance, getMockPrice, searchStocks, addWatchlistStock, getWatchlistAssets, deleteWatchlistAsset } from '@/lib/db/finance'
 import { getBusinessIdeas, saveBusinessIdea, deleteBusinessIdea, IDEA_CATEGORIES } from '@/lib/db/business-ideas'
+import { analyzeAndSaveIdeaAsync, computeBusinessIdeasStats } from '@/lib/business-coach'
+import BusinessIdeasDashboard from '@/components/business/BusinessIdeasDashboard'
+import BusinessIdeaAnalysisPanel from '@/components/business/BusinessIdeaAnalysisPanel'
+import ConvertAnalysisToProjectModal from '@/components/business/ConvertAnalysisToProjectModal'
 import { getQuotes, saveQuote, deleteQuote } from '@/lib/db/quotes'
 import { getCharacterAreas, getAllCharacterAreas, setCharacterLevel, updateCharacterArea, deleteCharacterArea, restoreCharacterArea, permanentDeleteCharacterArea, saveCharacterArea } from '@/lib/db/character'
 import Card from '@/components/ui/Card'
@@ -1150,8 +1154,15 @@ function IdeasSection() {
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<BusinessIdea | null>(null)
   const [convertingIdea, setConvertingIdea] = useState<BusinessIdea | null>(null)
+  const [analyzingId, setAnalyzingId] = useState<string | null>(null)
+  const [viewingAnalysisId, setViewingAnalysisId] = useState<string | null>(null)
+  const [convertingProjectIdea, setConvertingProjectIdea] = useState<BusinessIdea | null>(null)
+  const [lastAnalysisSource, setLastAnalysisSource] = useState<'gemini' | 'rules'>('rules')
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null)
 
   useEffect(() => { setItems(getBusinessIdeas()) }, [])
+
+  const stats = useMemo(() => computeBusinessIdeasStats(items), [items])
 
   const filtered = useMemo(() => {
     let list = items
@@ -1165,6 +1176,8 @@ function IdeasSection() {
     return [...list].sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1))
   }, [items, search, statusFilter])
 
+  const viewingIdea = viewingAnalysisId ? items.find((i) => i.id === viewingAnalysisId) : null
+
   const handleSave = (item: BusinessIdea) => {
     const updated = { ...item, updatedAt: Date.now() }
     setItems(saveBusinessIdea(updated))
@@ -1175,10 +1188,53 @@ function IdeasSection() {
   const handleDelete = (id: string) => {
     setItems(deleteBusinessIdea(id))
     if (editing?.id === id) { setEditing(null); setShowForm(false) }
+    if (viewingAnalysisId === id) setViewingAnalysisId(null)
+  }
+
+  const handleAnalyze = async (item: BusinessIdea) => {
+    setAnalyzingId(item.id)
+    setAnalyzeError(null)
+    try {
+      const saved = { ...item, updatedAt: Date.now() }
+      saveBusinessIdea(saved)
+      const { idea: updated, source, error } = await analyzeAndSaveIdeaAsync(saved)
+      setLastAnalysisSource(source)
+      if (error) setAnalyzeError(error)
+      setItems(getBusinessIdeas())
+      setViewingAnalysisId(updated.id)
+      if (editing?.id === updated.id) setEditing(updated)
+    } finally {
+      setAnalyzingId(null)
+    }
   }
 
   return (
     <div className="space-y-6">
+      <BusinessIdeasDashboard
+        stats={stats}
+        onSelectIdea={(id) => setViewingAnalysisId(id)}
+      />
+
+      {analyzeError && (
+        <Card className="border-amber-200 bg-amber-50 p-4">
+          <p className="text-sm text-amber-900">
+            <span className="font-semibold">Gemini unavailable — showing offline analysis.</span>{' '}
+            {analyzeError.includes('429') || analyzeError.includes('quota')
+              ? 'Your API key has no quota for the default model. Restart dev server after setting GEMINI_MODEL=gemini-2.5-flash in .env.local, then click Re-analyze Idea.'
+              : analyzeError}
+          </p>
+        </Card>
+      )}
+
+      {viewingIdea?.analysis && (
+        <BusinessIdeaAnalysisPanel
+          analysis={viewingIdea.analysis}
+          ideaTitle={viewingIdea.title || 'Untitled Idea'}
+          onConvertToProject={() => setConvertingProjectIdea(viewingIdea)}
+          poweredByGemini={viewingIdea.analysisSource === 'gemini'}
+        />
+      )}
+
       <div className="flex gap-3">
         <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search ideas..."
           className="flex-1 rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-900 placeholder-gray-300 focus:border-gray-400 focus:outline-none focus:ring-0" />
@@ -1207,6 +1263,8 @@ function IdeasSection() {
           onSave={handleSave}
           onDelete={editing ? () => handleDelete(editing.id) : undefined}
           onConvert={editing ? (idea) => setConvertingIdea(idea) : undefined}
+          onAnalyze={editing ? (idea) => handleAnalyze(idea) : undefined}
+          analyzing={editing ? analyzingId === editing.id : false}
         />
       )}
 
@@ -1223,6 +1281,11 @@ function IdeasSection() {
                 <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${statusColor(item.status)}`}>
                   {IDEA_STATUSES.find((s) => s.value === item.status)?.label ?? item.status}
                 </span>
+                {item.analysis && (
+                  <span className="shrink-0 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-medium text-violet-700 tabular-nums">
+                    {item.analysis.overallScore}/100
+                  </span>
+                )}
               </div>
               <span className="shrink-0 text-xs text-gray-400 ml-3">
                 {new Date(item.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
@@ -1242,6 +1305,17 @@ function IdeasSection() {
                 </div>
               )}
               <div className="flex gap-2 pt-2 flex-wrap">
+                <button onClick={() => handleAnalyze(item)}
+                  disabled={analyzingId === item.id}
+                  className="rounded px-2 py-1 text-xs font-medium text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 transition-colors">
+                  {analyzingId === item.id ? 'Analyzing…' : item.analysis ? 'Re-analyze Idea' : 'Analyze Idea'}
+                </button>
+                {item.analysis && (
+                  <button onClick={() => setViewingAnalysisId(viewingAnalysisId === item.id ? null : item.id)}
+                    className="rounded px-2 py-1 text-xs font-medium text-violet-700 bg-violet-50 hover:bg-violet-100 transition-colors">
+                    {viewingAnalysisId === item.id ? 'Hide Analysis' : 'View Analysis'}
+                  </button>
+                )}
                 <button onClick={() => { setEditing(item); setShowForm(true) }}
                   className="rounded px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors">Edit</button>
                 <button onClick={() => setConvertingIdea(item)}
@@ -1251,6 +1325,9 @@ function IdeasSection() {
                 <button onClick={() => handleDelete(item.id)}
                   className="rounded px-2 py-1 text-xs font-medium text-red-500 hover:bg-red-50 transition-colors">Delete</button>
               </div>
+              {viewingAnalysisId === item.id && !item.analysis && (
+                <p className="text-xs text-gray-400 pt-1">Run Analyze Idea to generate a business analysis.</p>
+              )}
             </div>
           </details>
         ))}
@@ -1260,6 +1337,13 @@ function IdeasSection() {
         <ConvertIdeaToWorkModal
           idea={convertingIdea}
           onClose={() => setConvertingIdea(null)}
+        />
+      )}
+
+      {convertingProjectIdea && (
+        <ConvertAnalysisToProjectModal
+          idea={convertingProjectIdea}
+          onClose={() => setConvertingProjectIdea(null)}
         />
       )}
     </div>
@@ -1279,8 +1363,13 @@ function blankIdea(): BusinessIdea {
   }
 }
 
-function IdeaForm({ initial, onSave, onDelete, onConvert }: {
-  initial: BusinessIdea; onSave: (i: BusinessIdea) => void; onDelete?: () => void; onConvert?: (i: BusinessIdea) => void
+function IdeaForm({ initial, onSave, onDelete, onConvert, onAnalyze, analyzing }: {
+  initial: BusinessIdea
+  onSave: (i: BusinessIdea) => void
+  onDelete?: () => void
+  onConvert?: (i: BusinessIdea) => void
+  onAnalyze?: (i: BusinessIdea) => void
+  analyzing?: boolean
 }) {
   const [form, setForm] = useState(initial)
 
@@ -1323,6 +1412,12 @@ function IdeaForm({ initial, onSave, onDelete, onConvert }: {
         <div className="flex gap-2 flex-wrap">
           <button onClick={handleSave}
             className="rounded-lg bg-gray-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-gray-800 transition-colors">Save</button>
+          {onAnalyze && form.title.trim() && (
+            <button type="button" onClick={() => onAnalyze(form)} disabled={analyzing}
+              className="rounded-lg bg-violet-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50 transition-colors">
+              {analyzing ? 'Analyzing…' : form.analysis ? 'Re-analyze Idea' : 'Analyze Idea'}
+            </button>
+          )}
           {onConvert && form.title.trim() && (
             <button type="button" onClick={() => onConvert(form)}
               className="rounded-lg border border-gray-200 px-4 py-1.5 text-sm font-medium text-gray-900 hover:bg-gray-50 transition-colors">
