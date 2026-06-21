@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { getDailyStats } from '@/lib/analytics'
 import { getUnifiedScore } from '@/lib/score'
 import { computeHealthScore } from '@/lib/health-score'
@@ -30,6 +30,16 @@ import { computeLifeScore } from '@/lib/life-score'
 import Card from '@/components/ui/Card'
 import MiniBarChart from '@/components/analytics/MiniBarChart'
 import AnalyticsSection, { StatCard, TrendBadge } from '@/components/analytics/AnalyticsSection'
+import AIWeeklyReviewCard from '@/components/analytics/AIWeeklyReviewCard'
+import { generateWeeklyReviewAsync, buildWeeklyReviewSnapshot, type WeeklyReview } from '@/lib/weekly-review'
+import { generateMonthlyReviewAsync, buildMonthlyReviewSnapshot, type MonthlyReview } from '@/lib/monthly-review'
+import AIMonthlyReviewCard from '@/components/analytics/AIMonthlyReviewCard'
+import { computeAnalyticsInsights } from '@/lib/analytics-insights'
+import {
+  Trends30DaySection,
+  PersonalInsightsCard,
+  PatternDetectionCard,
+} from '@/components/analytics/AnalyticsInsightsSections'
 
 function dateStr(date: Date): string {
   return date.toISOString().split('T')[0]
@@ -153,6 +163,52 @@ interface Computed {
 }
 
 export default function AnalyticsPage() {
+  const [weeklyReview, setWeeklyReview] = useState<WeeklyReview | null>(null)
+  const [weeklyReviewLoading, setWeeklyReviewLoading] = useState(true)
+  const [weeklyReviewError, setWeeklyReviewError] = useState<string | null>(null)
+  const weekLabel = useMemo(() => buildWeeklyReviewSnapshot().weekLabel, [])
+
+  const [monthlyReview, setMonthlyReview] = useState<MonthlyReview | null>(null)
+  const [monthlyReviewLoading, setMonthlyReviewLoading] = useState(true)
+  const [monthlyReviewError, setMonthlyReviewError] = useState<string | null>(null)
+  const monthLabel = useMemo(() => buildMonthlyReviewSnapshot().monthLabel, [])
+
+  const analyticsInsights = useMemo(() => computeAnalyticsInsights(), [])
+
+  useEffect(() => {
+    let cancelled = false
+    setWeeklyReviewLoading(true)
+    generateWeeklyReviewAsync()
+      .then(({ review, error }) => {
+        if (cancelled) return
+        setWeeklyReview(review)
+        setWeeklyReviewError(error ?? null)
+        setWeeklyReviewLoading(false)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setWeeklyReviewLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    setMonthlyReviewLoading(true)
+    generateMonthlyReviewAsync()
+      .then(({ review, error }) => {
+        if (cancelled) return
+        setMonthlyReview(review)
+        setMonthlyReviewError(error ?? null)
+        setMonthlyReviewLoading(false)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setMonthlyReviewLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [])
+
   const c = useMemo((): Computed => {
     const workItems = getWorkItems()
     const sessions = getAllSessions()
@@ -513,6 +569,38 @@ export default function AnalyticsPage() {
         <h1 className="text-4xl font-bold tracking-tight">Analytics</h1>
         <p className="text-gray-500">Complete Life OS overview — productivity, health, sleep, character &amp; finance</p>
       </div>
+
+      {weeklyReviewLoading && !weeklyReview && (
+        <Card className="p-8 text-center ring-1 ring-indigo-500/10">
+          <p className="text-sm text-gray-500">Generating your AI Weekly Review…</p>
+        </Card>
+      )}
+      {weeklyReview && (
+        <AIWeeklyReviewCard
+          review={weeklyReview}
+          weekLabel={weekLabel}
+          loading={weeklyReviewLoading}
+          error={weeklyReviewError}
+        />
+      )}
+
+      {monthlyReviewLoading && !monthlyReview && (
+        <Card className="p-8 text-center ring-1 ring-violet-500/10">
+          <p className="text-sm text-gray-500">Generating your AI Monthly Review…</p>
+        </Card>
+      )}
+      {monthlyReview && (
+        <AIMonthlyReviewCard
+          review={monthlyReview}
+          monthLabel={monthLabel}
+          loading={monthlyReviewLoading}
+          error={monthlyReviewError}
+        />
+      )}
+
+      <Trends30DaySection trends={analyticsInsights.trends30Day} />
+      <PersonalInsightsCard insights={analyticsInsights.personalInsights} />
+      <PatternDetectionCard patterns={analyticsInsights.patterns} />
 
       <section>
         <div className="mb-4">
