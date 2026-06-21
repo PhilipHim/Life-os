@@ -1,4 +1,5 @@
 import type { Task } from '@/lib/types'
+import { awardLegacyTaskCompleted } from '@/lib/xp/award'
 
 const STORAGE_KEY = 'productivity_tasks'
 
@@ -35,7 +36,11 @@ export function addTask(task: Task): Task[] {
 
 export function updateTask(updated: Task): Task[] {
   const tasks = getTasks()
+  const prev = tasks.find((t) => t.id === updated.id)
   saveTasks(tasks.map((t) => (t.id === updated.id ? updated : t)))
+  if (prev && !prev.completed && updated.completed) {
+    awardLegacyTaskCompleted(updated.id, updated.title, updated.completedAt ?? Date.now())
+  }
   return getTasks()
 }
 

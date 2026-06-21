@@ -12,7 +12,7 @@ import {
   computeCharacterAnalytics,
 } from '@/lib/life-analytics'
 import { computeHealthScore } from '@/lib/health-score'
-import type { MonthlyReviewSnapshot, CharacterGrowthItem, TrendDirection } from '@/lib/monthly-review/types'
+import type { MonthlyReviewSnapshot, CharacterGrowthItem, TrendDirection, ScoreTrend } from '@/lib/monthly-review/types'
 
 function dateStr(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -189,9 +189,9 @@ export function formatScoreTrend(
   start: number | null,
   end: number | null,
   change: number | null
-): { direction: TrendDirection; summary: string } {
+): ScoreTrend {
   if (start == null && end == null) {
-    return { direction: 'Unknown', summary: 'No data logged' }
+    return { start: null, end: null, direction: 'Unknown', summary: 'No data logged' }
   }
   const s = start ?? end ?? 0
   const e = end ?? start ?? 0
@@ -201,5 +201,5 @@ export function formatScoreTrend(
     : end != null
       ? `${Math.round(e)}/100 avg`
       : 'Insufficient data'
-  return { direction, summary }
+  return { start, end, direction, summary }
 }

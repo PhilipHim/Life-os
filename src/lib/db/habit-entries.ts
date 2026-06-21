@@ -1,4 +1,5 @@
 import type { HabitEntry } from '@/lib/types'
+import { awardHabitIfSuccessful } from '@/lib/xp/award'
 
 const STORAGE_KEY = 'productivity_habit_entries'
 
@@ -29,15 +30,19 @@ export function setEntry(habitId: string, date: string, value: number, completed
   const entries = getEntries()
   const existing = entries.find((e) => e.habitId === habitId && e.date === date)
   if (existing) {
-    return updateEntry({ ...existing, value, completed })
+    const result = updateEntry({ ...existing, value, completed })
+    awardHabitIfSuccessful(habitId, date)
+    return result
   }
-  return addEntry({
+  const result = addEntry({
     id: crypto.randomUUID(),
     habitId,
     date,
     value,
     completed,
   })
+  awardHabitIfSuccessful(habitId, date)
+  return result
 }
 
 export function addEntry(entry: HabitEntry): HabitEntry[] {
@@ -53,6 +58,15 @@ export function updateEntry(updated: HabitEntry): HabitEntry[] {
 }
 
 export function deleteEntry(id: string): HabitEntry[] {
-  saveEntries(getEntries().filter((e) => e.id !== id))
+  const entry = getEntries().find((e) => e.id === id)
+  const result = saveAndReturn(getEntries().filter((e) => e.id !== id))
+  if (entry) {
+    awardHabitIfSuccessful(entry.habitId, entry.date)
+  }
+  return result
+}
+
+function saveAndReturn(entries: HabitEntry[]): HabitEntry[] {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(entries))
   return getEntries()
 }

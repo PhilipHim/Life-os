@@ -1,4 +1,5 @@
 import type { HealthEntry } from '@/lib/types'
+import { awardHealthEntry } from '@/lib/xp/award'
 
 const STORAGE_KEY = 'life_os_health'
 
@@ -30,6 +31,7 @@ export function saveHealthEntry(entry: HealthEntry): HealthEntry[] {
     entries.push(entry)
   }
   saveEntries(entries)
+  awardHealthEntry(entry)
   return getHealthEntries()
 }
 

@@ -40,6 +40,7 @@ import {
   PersonalInsightsCard,
   PatternDetectionCard,
 } from '@/components/analytics/AnalyticsInsightsSections'
+import { computeXpAnalytics } from '@/lib/xp'
 
 function dateStr(date: Date): string {
   return date.toISOString().split('T')[0]
@@ -207,6 +208,15 @@ export default function AnalyticsPage() {
         setMonthlyReviewLoading(false)
       })
     return () => { cancelled = true }
+  }, [])
+
+  const [xpAnalytics, setXpAnalytics] = useState<ReturnType<typeof computeXpAnalytics> | null>(null)
+
+  useEffect(() => {
+    setXpAnalytics(computeXpAnalytics())
+    const refresh = () => setXpAnalytics(computeXpAnalytics())
+    window.addEventListener('xp-updated', refresh)
+    return () => window.removeEventListener('xp-updated', refresh)
   }, [])
 
   const c = useMemo((): Computed => {
@@ -596,6 +606,77 @@ export default function AnalyticsPage() {
           loading={monthlyReviewLoading}
           error={monthlyReviewError}
         />
+      )}
+
+      {xpAnalytics && (
+        <AnalyticsSection
+          title="Level & XP"
+          subtitle="Progression, level milestones, and XP growth"
+          hasData={xpAnalytics.hasData}
+          emptyMessage="Complete tasks, habits, and Life OS activities to earn XP."
+        >
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-3">
+            <StatCard
+              label="Current Level"
+              value={String(xpAnalytics.progress.level)}
+              sublabel={xpAnalytics.progress.title}
+            />
+            <StatCard
+              label="Total XP"
+              value={xpAnalytics.progress.totalXp.toLocaleString()}
+              sublabel={`Level ${xpAnalytics.progress.level + 1} at ${xpAnalytics.nextLevelAt.toLocaleString()} XP`}
+            />
+            <StatCard
+              label="XP to Next Level"
+              value={xpAnalytics.xpRemaining.toLocaleString()}
+              sublabel={`${xpAnalytics.progress.progressPct}% complete`}
+            />
+            <StatCard
+              label="XP This Week"
+              value={`+${xpAnalytics.history.weekly}`}
+              sublabel={`Today +${xpAnalytics.history.daily} · Month +${xpAnalytics.history.monthly}`}
+            />
+          </div>
+          <Card className="p-4 mb-3">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400">
+                Level Progress
+              </p>
+              <p className="text-xs text-gray-500 tabular-nums">
+                {xpAnalytics.progress.currentXp.toLocaleString()} / {xpAnalytics.progress.xpToNextLevel.toLocaleString()} XP
+              </p>
+            </div>
+            <div className="h-2.5 rounded-full bg-gray-100 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-gray-900 transition-all duration-500"
+                style={{ width: `${xpAnalytics.progress.progressPct}%` }}
+              />
+            </div>
+          </Card>
+          <div className="grid gap-3 lg:grid-cols-2">
+            <Card className="p-4">
+              <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400 mb-3">
+                XP Growth (7 days)
+              </p>
+              <MiniBarChart
+                data={xpAnalytics.xpGrowthWeek.map((p) => ({ label: p.label, value: p.value }))}
+                max={Math.max(20, ...xpAnalytics.xpGrowthWeek.map((p) => p.value), 1)}
+              />
+            </Card>
+            <Card className="p-4">
+              <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400 mb-3">
+                XP Growth (30 days)
+              </p>
+              <MiniBarChart
+                data={xpAnalytics.xpGrowthMonth.filter((_, i) => i % 5 === 0).map((p) => ({
+                  label: p.label,
+                  value: p.value,
+                }))}
+                max={Math.max(20, ...xpAnalytics.xpGrowthMonth.map((p) => p.value), 1)}
+              />
+            </Card>
+          </div>
+        </AnalyticsSection>
       )}
 
       <Trends30DaySection trends={analyticsInsights.trends30Day} />

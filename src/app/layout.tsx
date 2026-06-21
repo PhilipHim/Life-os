@@ -3,7 +3,9 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 import Navbar from '@/components/Navbar'
 import FocusOverlay from '@/components/FocusOverlay'
+import LevelUpListener from '@/components/profile/LevelUpListener'
 import { WorkItemProvider } from '@/lib/WorkItemContext'
+import { TaskProvider } from '@/lib/TaskContext'
 import { FocusProvider } from '@/lib/FocusContext'
 import { HabitProvider } from '@/lib/HabitContext'
 import { DailyPlanProvider } from '@/lib/DailyPlanContext'
@@ -35,17 +37,20 @@ export default function RootLayout({
     >
       <body className="flex min-h-full flex-col bg-gray-50 text-gray-900">
         <WorkItemProvider>
-          <FocusProvider>
-            <HabitProvider>
-              <DailyPlanProvider>
-                <Navbar />
-                <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-12">
-                  {children}
-                </main>
-                <FocusOverlay />
-              </DailyPlanProvider>
-            </HabitProvider>
-          </FocusProvider>
+          <TaskProvider>
+            <FocusProvider>
+              <HabitProvider>
+                <DailyPlanProvider>
+                  <Navbar />
+                  <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-12">
+                    {children}
+                  </main>
+                  <FocusOverlay />
+                  <LevelUpListener />
+                </DailyPlanProvider>
+              </HabitProvider>
+            </FocusProvider>
+          </TaskProvider>
         </WorkItemProvider>
       </body>
     </html>

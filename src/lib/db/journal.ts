@@ -1,4 +1,5 @@
 import type { JournalEntry } from '@/lib/types'
+import { awardJournalEntry } from '@/lib/xp/award'
 
 const STORAGE_KEY = 'life_os_journal'
 
@@ -34,6 +35,7 @@ export function saveJournalEntry(entry: JournalEntry): JournalEntry[] {
     entries.push(entry)
   }
   saveEntries(entries)
+  awardJournalEntry(entry.date)
   return getJournalEntries()
 }
 

@@ -1,4 +1,5 @@
 import type { WorkItem } from '@/lib/types'
+import { awardWorkItemCompleted } from '@/lib/xp/award'
 
 const STORAGE_KEY = 'productivity_work_items'
 const MIGRATED_KEY = 'productivity_work_items_migrated'
@@ -89,7 +90,16 @@ export function addWorkItem(item: WorkItem): WorkItem[] {
 
 export function updateWorkItem(updated: WorkItem): WorkItem[] {
   const items = getWorkItems()
+  const prev = items.find((i) => i.id === updated.id)
   saveWorkItems(items.map((i) => (i.id === updated.id ? updated : i)))
+  if (
+    prev &&
+    prev.status !== 'completed' &&
+    updated.status === 'completed' &&
+    updated.type === 'single'
+  ) {
+    awardWorkItemCompleted(updated.id, updated.title, updated.completedAt ?? updated.updatedAt)
+  }
   return getWorkItems()
 }
 
@@ -105,8 +115,17 @@ export function getWorkItemById(id: string): WorkItem | undefined {
 export function updateWorkItems(items: WorkItem[]): WorkItem[] {
   const all = getWorkItems()
   for (const item of items) {
+    const prev = all.find((i) => i.id === item.id)
     const idx = all.findIndex((i) => i.id === item.id)
     if (idx !== -1) all[idx] = item
+    if (
+      prev &&
+      prev.status !== 'completed' &&
+      item.status === 'completed' &&
+      item.type === 'single'
+    ) {
+      awardWorkItemCompleted(item.id, item.title, item.completedAt ?? item.updatedAt)
+    }
   }
   saveWorkItems(all)
   return getWorkItems()

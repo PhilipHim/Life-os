@@ -1,0 +1,6 @@
+export { XP_REWARDS } from '@/lib/xp/constants'
+export { getTotalXp, getXpState, getXpHistory, emitXpUpdated } from '@/lib/xp/state'
+export { computeXpAnalytics } from '@/lib/xp/analytics'
+export { computeLevelFromXp, xpToReachLevel, xpIncrementForLevel } from '@/lib/xp/levels'
+export type { XpSource, XpEvent, XpState, XpHistory } from '@/lib/xp/types'
+export type { XpAnalytics, XpGrowthPoint } from '@/lib/xp/analytics'

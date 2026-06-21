@@ -1,3 +1,24 @@
+export interface Task {
+  id: string
+  title: string
+  description: string
+  notes: string
+  completed: boolean
+  recurring: 'none' | 'daily' | 'weekly'
+  completedAt: number | null
+  createdAt: number
+}
+
+export interface Project {
+  id: string
+  taskIds: string[]
+  title: string
+  description: string
+  notes: string
+  completed: boolean
+  createdAt: number
+}
+
 export interface WorkItem {
   id: string
   type: 'single' | 'group'

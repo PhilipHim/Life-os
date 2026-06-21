@@ -10,6 +10,7 @@ const links = [
   { href: '/habits', label: 'Habits' },
   { href: '/life-os', label: 'Life OS' },
   { href: '/analytics', label: 'Analytics' },
+  { href: '/profile', label: 'Profile' },
 ]
 
 export default function Navbar() {

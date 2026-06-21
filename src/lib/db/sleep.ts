@@ -1,4 +1,5 @@
 import type { SleepEntry } from '@/lib/types'
+import { awardSleepEntry } from '@/lib/xp/award'
 
 const STORAGE_KEY = 'life_os_sleep'
 
@@ -34,6 +35,7 @@ export function saveSleepEntry(entry: SleepEntry): SleepEntry[] {
     entries.push(entry)
   }
   saveEntries(entries)
+  awardSleepEntry(entry)
   return getSleepEntries()
 }
 
