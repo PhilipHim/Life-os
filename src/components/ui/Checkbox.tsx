@@ -15,10 +15,10 @@ export default function Checkbox({ checked, onChange, className = '', disabled =
       aria-checked={checked}
       disabled={disabled}
       onClick={disabled ? undefined : onChange}
-      className={`relative size-6 shrink-0 rounded-md border-2 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 ${
+      className={`relative size-6 shrink-0 rounded-md border-2 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-los-gold/40 focus:ring-offset-2 focus:ring-offset-los-bg-card ${
         checked
-          ? 'border-gray-900 bg-gray-900'
-          : 'border-gray-300 hover:border-gray-400'
+          ? 'border-los-gold bg-los-gold'
+          : 'border-los-border hover:border-los-border-gold'
       } ${disabled ? 'opacity-40 cursor-not-allowed' : ''} ${className}`}
     >
       <svg
@@ -30,7 +30,7 @@ export default function Checkbox({ checked, onChange, className = '', disabled =
       >
         <path
           d="M3 8.5L6.5 12L13 4"
-          stroke="white"
+          stroke="#0B1020"
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"

@@ -5,8 +5,7 @@ import Link from 'next/link'
 import { useWorkItems } from '@/lib/WorkItemContext'
 import { useFocus } from '@/lib/FocusContext'
 import { useDailyPlan } from '@/lib/DailyPlanContext'
-import { formatFocusTime } from '@/lib/focus'
-import { computeProductivityScore, generateProductivityInsights, type ProductivityScore } from '@/lib/productivity-score'
+import { computeProductivityScore, generateProductivityInsights } from '@/lib/productivity-score'
 import { useHabits } from '@/lib/HabitContext'
 import { getInsights } from '@/lib/insights'
 import { getWeeklyReport, type WeeklyReport } from '@/lib/weekly'
@@ -27,88 +26,21 @@ import {
 import type { CharacterArea, JournalEntry } from '@/lib/types'
 import { generateCoachReportAsync, type CoachReport } from '@/lib/coach'
 import Card from '@/components/ui/Card'
+import ProgressBar from '@/components/ui/ProgressBar'
 import AICoachCard from '@/components/coach/AICoachCard'
 import DashboardChallengesCard from '@/components/challenges/DashboardChallengesCard'
-
+import {
+  StrategicSection,
+  ScoreHeroCard,
+  KpiCard,
+} from '@/components/strategic'
+import { CompassIcon, MountainIcon } from '@/design-system/icons'
+import { losClasses } from '@/design-system/tokens'
 import { orderPlanItems } from '@/lib/planner'
 
 function todayLocal(): string {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
-function BreakDownRow({
-  label,
-  score,
-  max,
-  percentage,
-}: {
-  label: string
-  score: number
-  max: number
-  percentage: number
-}) {
-  return (
-    <div>
-      <div className="flex items-center justify-between text-sm">
-        <span className="text-gray-700">{label}</span>
-        <span className="text-gray-900 font-medium tabular-nums">
-          {score}<span className="text-gray-400 font-normal"> / {max}</span>
-        </span>
-      </div>
-      <div className="mt-1 h-1.5 rounded-full bg-gray-100 overflow-hidden">
-        <div
-          className="h-full rounded-full bg-gray-900 transition-all duration-500"
-          style={{ width: `${Math.min(percentage, 100)}%` }}
-        />
-      </div>
-    </div>
-  )
-}
-
-function SectionHeading({ title, href, linkLabel }: { title: string; href?: string; linkLabel?: string }) {
-  return (
-    <div className="flex items-center justify-between mb-4">
-      <h2 className="text-sm font-semibold uppercase tracking-widest text-gray-400">{title}</h2>
-      {href && linkLabel && (
-        <Link href={href} className="text-xs text-gray-500 hover:text-gray-900 transition-colors">
-          {linkLabel} →
-        </Link>
-      )}
-    </div>
-  )
-}
-
-function CompactKpiCard({
-  label,
-  metric,
-  sublabel,
-  progress,
-  href,
-}: {
-  label: string
-  metric: string
-  sublabel?: string
-  progress?: number
-  href: string
-}) {
-  return (
-    <Link href={href} className="block group">
-      <Card className="p-4 transition-all duration-200 group-hover:border-gray-300 group-hover:shadow-md group-hover:-translate-y-0.5 cursor-pointer h-full">
-        <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400">{label}</p>
-        <p className="mt-1.5 text-2xl font-bold text-gray-900 tabular-nums">{metric}</p>
-        {sublabel && <p className="mt-0.5 text-xs text-gray-500">{sublabel}</p>}
-        {progress !== undefined && (
-          <div className="mt-2 h-1 rounded-full bg-gray-100 overflow-hidden">
-            <div
-              className="h-full rounded-full bg-gray-900 transition-all duration-500"
-              style={{ width: `${Math.min(progress, 100)}%` }}
-            />
-          </div>
-        )}
-      </Card>
-    </Link>
-  )
 }
 
 function isJournalCompletedToday(entry: JournalEntry | undefined): boolean {
@@ -173,8 +105,8 @@ export default function DashboardPage() {
     total: todayHabitsTotal,
   }), [todayHabitsDone, todayHabitsTotal])
 
-  const productivityScore = useMemo<ProductivityScore>(() =>
-    computeProductivityScore(planItems, workItems, focusSessions, habitStats),
+  const productivityScore = useMemo(
+    () => computeProductivityScore(planItems, workItems, focusSessions, habitStats),
     [planItems, workItems, focusSessions, habitStats]
   )
 
@@ -343,74 +275,55 @@ export default function DashboardPage() {
   ])
 
   return (
-    <div className="space-y-10">
-      <div className="space-y-1">
-        <h1 className="text-4xl font-bold tracking-tight">Command Center</h1>
-        <p className="text-base text-gray-500">Your Life OS overview — productivity, health, and daily progress at a glance</p>
-      </div>
+    <div className={`${losClasses.page} space-y-12`}>
+      <header className={losClasses.pageHeader}>
+        <div className="flex items-center gap-3">
+          <CompassIcon size={28} className="text-los-gold" />
+          <h1 className={losClasses.pageTitle}>Command Center</h1>
+        </div>
+        <p className={losClasses.pageSubtitle}>
+          Your Life OS overview — productivity, health, and daily progress at a glance
+        </p>
+      </header>
 
-      {/* SECTION 1: Hero Scores */}
       <div className="grid gap-6 md:grid-cols-2">
-        <Card className="relative overflow-hidden ring-1 ring-gray-900/5 shadow-md">
-          <div className="absolute inset-x-0 top-0 h-1 bg-gray-900" />
-          <div className="text-center pt-2">
-            <p className="text-xs font-medium uppercase tracking-widest text-gray-400">Productivity Score</p>
-            <p className="mt-3 text-7xl font-bold text-gray-900 tabular-nums leading-none">
-              {productivityScore.total}
-              <span className="text-3xl font-normal text-gray-400"> / 100</span>
-            </p>
-            <div className="mt-4 h-2.5 rounded-full bg-gray-100 overflow-hidden max-w-sm mx-auto">
-              <div
-                className="h-full rounded-full bg-gray-900 transition-all duration-700 ease-out"
-                style={{ width: `${productivityScore.total}%` }}
-              />
-            </div>
-            <div className="mt-6 space-y-2.5 max-w-sm mx-auto text-left">
-              <BreakDownRow label="Planner" score={productivityScore.planner.score} max={productivityScore.planner.max} percentage={productivityScore.planner.percentage} />
-              <BreakDownRow label="Priority" score={productivityScore.priority.score} max={productivityScore.priority.max} percentage={productivityScore.priority.percentage} />
-              <BreakDownRow label="Focus" score={productivityScore.focus.score} max={productivityScore.focus.max} percentage={productivityScore.focus.percentage} />
-              <BreakDownRow label="Habits" score={productivityScore.habits.score} max={productivityScore.habits.max} percentage={productivityScore.habits.percentage} />
-            </div>
-          </div>
-        </Card>
+        <ScoreHeroCard
+          label="Productivity Score"
+          total={productivityScore.total}
+          max={100}
+          breakdown={[
+            { label: 'Planner', ...productivityScore.planner, percentage: productivityScore.planner.percentage },
+            { label: 'Priority', ...productivityScore.priority, percentage: productivityScore.priority.percentage },
+            { label: 'Focus', ...productivityScore.focus, percentage: productivityScore.focus.percentage },
+            { label: 'Habits', ...productivityScore.habits, percentage: productivityScore.habits.percentage },
+          ]}
+        />
 
         {lifeScore && (
-          <Card className="relative overflow-hidden ring-1 ring-gray-900/5 shadow-md">
-            <div className="absolute inset-x-0 top-0 h-1 bg-gray-400" />
-            <div className="text-center pt-2">
-              <p className="text-xs font-medium uppercase tracking-widest text-gray-400">Life Score</p>
-              <p className="mt-3 text-7xl font-bold text-gray-900 tabular-nums leading-none">
-                {lifeScore.total}
-                <span className="text-3xl font-normal text-gray-400"> / {lifeScore.max}</span>
-              </p>
-              <div className="mt-4 h-2.5 rounded-full bg-gray-100 overflow-hidden max-w-sm mx-auto">
-                <div
-                  className="h-full rounded-full bg-gray-900 transition-all duration-700 ease-out"
-                  style={{ width: `${lifeScore.total}%` }}
-                />
-              </div>
-              <div className="mt-6 space-y-2.5 max-w-sm mx-auto text-left">
-                <BreakDownRow label="Productivity" score={lifeScore.productivity} max={lifeScore.max} percentage={lifeScore.productivity} />
-                <BreakDownRow label="Health" score={lifeScore.health ?? 0} max={lifeScore.max} percentage={lifeScore.health ?? 0} />
-                <BreakDownRow label="Mind" score={lifeScore.mind} max={lifeScore.max} percentage={lifeScore.mind} />
-                <BreakDownRow label="Habits" score={lifeScore.habits} max={lifeScore.max} percentage={lifeScore.habits} />
-              </div>
-            </div>
-          </Card>
+          <ScoreHeroCard
+            label="Life Score"
+            total={lifeScore.total}
+            max={lifeScore.max}
+            breakdown={[
+              { label: 'Productivity', score: lifeScore.productivity, max: lifeScore.max, percentage: lifeScore.productivity },
+              { label: 'Health', score: lifeScore.health ?? 0, max: lifeScore.max, percentage: lifeScore.health ?? 0 },
+              { label: 'Mind', score: lifeScore.mind, max: lifeScore.max, percentage: lifeScore.mind },
+              { label: 'Habits', score: lifeScore.habits, max: lifeScore.max, percentage: lifeScore.habits },
+            ]}
+          />
         )}
       </div>
 
-      {/* AI Coach */}
       {coachLoading && !coachReport && (
-        <Card className="p-8 text-center">
-          <p className="text-sm text-gray-500">AI Coach is analyzing your Life OS data…</p>
+        <Card variant="ai" className="p-8 text-center los-ai-surface">
+          <p className="text-sm text-los-ai">AI Coach is analyzing your Life OS data…</p>
         </Card>
       )}
       {coachReport && (
         <>
           {coachError && (
-            <Card className="border-amber-200 bg-amber-50 p-4">
-              <p className="text-sm text-amber-900">
+            <Card className="border-los-warning/40 bg-los-warning/10 p-4">
+              <p className="text-sm text-los-warning">
                 <span className="font-semibold">Gemini unavailable — showing offline coach.</span>{' '}
                 {coachError.includes('429') || coachError.includes('quota')
                   ? 'API quota exceeded. Wait a minute or set GEMINI_MODEL=gemini-2.5-flash in .env.local and restart the dev server.'
@@ -422,180 +335,164 @@ export default function DashboardPage() {
         </>
       )}
 
-      {/* SECTION 2: Today Overview */}
-      <div>
-        <SectionHeading title="Today Overview" href="/life-os" linkLabel="Open Life OS" />
+      <StrategicSection title="Today Overview" subtitle="Daily health, wellness, and habit snapshot" href="/life-os" linkLabel="Open Life OS">
         <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
-          <CompactKpiCard
+          <KpiCard
             label="Sleep Score"
             metric={lifeOsSnapshot.sleepScore != null ? String(lifeOsSnapshot.sleepScore) : '—'}
             sublabel={lifeOsSnapshot.sleepScore != null ? 'Logged today' : 'Not logged'}
             href="/life-os"
           />
-          <CompactKpiCard
+          <KpiCard
             label="Health Score"
             metric={lifeOsSnapshot.healthScore != null ? String(lifeOsSnapshot.healthScore) : '—'}
             sublabel={lifeOsSnapshot.healthScore != null ? 'Logged today' : 'Not logged'}
             href="/life-os"
           />
-          <CompactKpiCard
+          <KpiCard
             label="Days Without Illness"
             metric={lifeOsSnapshot.isSick ? '0' : String(lifeOsSnapshot.daysWithoutIllness)}
             sublabel={lifeOsSnapshot.isSick ? 'Currently sick' : 'Healthy streak'}
             href="/life-os"
+            highlight={!lifeOsSnapshot.isSick && lifeOsSnapshot.daysWithoutIllness > 0}
           />
-          <CompactKpiCard
+          <KpiCard
             label="Journal Today"
             metric={lifeOsSnapshot.journalCompleted ? 'Done' : '—'}
             sublabel={lifeOsSnapshot.journalCompleted ? 'Entry saved' : 'Not completed'}
             href="/life-os"
+            highlight={lifeOsSnapshot.journalCompleted}
           />
-          <CompactKpiCard
+          <KpiCard
             label="Habits Today"
             metric={todayHabitsTotal > 0 ? `${habitRate}%` : '—'}
             sublabel={todayHabitsTotal > 0 ? `${todayHabitsDone}/${todayHabitsTotal} done` : 'No habits'}
             progress={habitRate}
             href="/habits/today"
+            highlight={habitRate >= 80}
           />
         </div>
-      </div>
+      </StrategicSection>
 
-      <div>
-        <SectionHeading title="Challenges" href="/profile" linkLabel="View profile" />
+      <StrategicSection
+        title="Challenges"
+        subtitle="Daily goals with bonus XP"
+        href="/profile"
+        linkLabel="View profile"
+        icon={<MountainIcon size={20} />}
+      >
         <DashboardChallengesCard />
-      </div>
+      </StrategicSection>
 
-      {/* SECTION 3: Daily Focus */}
-      <div>
-        <SectionHeading title="Daily Focus" href="/plan" linkLabel="Open Planner" />
+      <StrategicSection title="Daily Focus" subtitle="Execution priorities and planner momentum" href="/plan" linkLabel="Open Planner">
         <Card>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             <div>
-              <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400">Active Task</p>
-              <p className="mt-1.5 text-sm font-semibold text-gray-900 truncate">
+              <p className="los-section-label">Active Task</p>
+              <p className="mt-2 text-sm font-semibold text-los-text-primary truncate">
                 {dailyFocus.currentTask ?? 'None in focus'}
               </p>
-              {activeSession && (
-                <p className="mt-0.5 text-xs text-green-600 font-medium">In focus now</p>
-              )}
+              {activeSession && <p className="mt-1 text-xs text-los-success font-medium">In focus now</p>}
             </div>
             <div>
-              <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400">Next Priority</p>
-              <p className="mt-1.5 text-sm font-semibold text-gray-900 truncate">
+              <p className="los-section-label">Next Priority</p>
+              <p className="mt-2 text-sm font-semibold text-los-text-primary truncate">
                 {dailyFocus.nextTaskTitle ?? 'No high-priority items'}
               </p>
-              <Link href="/work" className="mt-0.5 text-xs text-gray-500 hover:text-gray-900 transition-colors">
+              <Link href="/work" className="mt-1 text-xs text-los-gold hover:text-los-gold-light transition-colors">
                 View work items →
               </Link>
             </div>
             <div>
-              <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400">Focus Streak</p>
-              <p className="mt-1.5 text-2xl font-bold text-gray-900 tabular-nums">
+              <p className="los-section-label">Focus Streak</p>
+              <p className="mt-2 text-2xl font-bold text-los-text-primary tabular-nums">
                 {dailyFocus.focusStreak}
-                <span className="text-sm font-normal text-gray-400"> days</span>
+                <span className="text-sm font-normal text-los-text-muted"> days</span>
               </p>
-              <p className="mt-0.5 text-xs text-gray-500">Consecutive days with focus</p>
+              <p className="mt-1 text-xs text-los-text-muted">Consecutive days with focus</p>
             </div>
             <div>
-              <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400">Planner Completion</p>
-              <p className="mt-1.5 text-2xl font-bold text-gray-900 tabular-nums">
+              <p className="los-section-label">Planner Completion</p>
+              <p className="mt-2 text-2xl font-bold text-los-gold tabular-nums">
                 {Math.round(dailyFocus.plannerCompletion)}%
               </p>
-              <div className="mt-2 h-1 rounded-full bg-gray-100 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-gray-900 transition-all duration-500"
-                  style={{ width: `${Math.min(dailyFocus.plannerCompletion, 100)}%` }}
-                />
+              <div className="mt-2">
+                <ProgressBar value={dailyFocus.plannerCompletion} variant="gold" size="sm" />
               </div>
             </div>
           </div>
         </Card>
-      </div>
+      </StrategicSection>
 
-      {/* SECTION 4: Character Development */}
-      <div>
-        <SectionHeading title="Character Development" href="/life-os" linkLabel="View all traits" />
+      <StrategicSection title="Character Development" subtitle="Top traits and weekly growth" href="/life-os" linkLabel="View all traits">
         <Card>
           {topCharacterTraits.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-2">No character traits yet</p>
+            <p className="text-sm text-los-text-muted text-center py-2">No character traits yet</p>
           ) : (
             <>
               <div className="grid gap-4 sm:grid-cols-3">
                 {topCharacterTraits.map((trait) => (
-                  <div key={trait.id} className="rounded-lg bg-gray-50 px-4 py-3">
+                  <div key={trait.id} className="rounded-lg border border-los-border bg-los-bg-secondary/50 px-4 py-3">
                     <div className="flex items-center justify-between">
-                      <p className="text-sm font-semibold text-gray-900">{trait.name}</p>
+                      <p className="text-sm font-semibold text-los-text-primary">{trait.name}</p>
                       {trait.updatedThisWeek && (
-                        <span className="text-[10px] font-medium text-green-600">↑ this week</span>
+                        <span className="text-[10px] font-medium text-los-success">↑ this week</span>
                       )}
                     </div>
-                    <p className="mt-1 text-xl font-bold text-gray-900 tabular-nums">
-                      {trait.level}<span className="text-sm font-normal text-gray-400">/10</span>
+                    <p className="mt-1 text-xl font-bold text-los-gold tabular-nums">
+                      {trait.level}<span className="text-sm font-normal text-los-text-muted">/10</span>
                     </p>
-                    <div className="mt-2 h-1.5 rounded-full bg-gray-200 overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-gray-900 transition-all duration-500"
-                        style={{ width: `${(trait.level / 10) * 100}%` }}
-                      />
+                    <div className="mt-2">
+                      <ProgressBar value={(trait.level / 10) * 100} variant="gold" size="sm" />
                     </div>
                   </div>
                 ))}
               </div>
-              <p className="mt-3 text-xs text-gray-400">
+              <p className="mt-3 text-xs text-los-text-muted">
                 {characterWeeklyTrend} trait{characterWeeklyTrend !== 1 ? 's' : ''} updated this week
               </p>
             </>
           )}
         </Card>
-      </div>
+      </StrategicSection>
 
-      {/* SECTION 5: Finance Snapshot */}
-      <div>
-        <SectionHeading title="Finance Snapshot" href="/life-os" linkLabel="View portfolio" />
+      <StrategicSection title="Finance Snapshot" subtitle="Portfolio performance today" href="/life-os" linkLabel="View portfolio">
         <Card>
           {lifeOsSnapshot.portfolioCount === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-2">No portfolio assets — add stocks in Life OS</p>
+            <p className="text-sm text-los-text-muted text-center py-2">No portfolio assets — add stocks in Life OS</p>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div>
-                <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400">Portfolio Today</p>
-                <p className={`mt-1.5 text-2xl font-bold tabular-nums ${lifeOsSnapshot.portfolioDailyPct >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                <p className="los-section-label">Portfolio Today</p>
+                <p className={`mt-2 text-2xl font-bold tabular-nums ${lifeOsSnapshot.portfolioDailyPct >= 0 ? 'text-los-success' : 'text-los-danger'}`}>
                   {formatPct(lifeOsSnapshot.portfolioDailyPct)}
                 </p>
               </div>
               <div>
-                <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400">Best Today</p>
-                <p className="mt-1.5 text-sm font-semibold text-gray-900">
-                  {lifeOsSnapshot.bestAsset?.symbol ?? '—'}
-                </p>
+                <p className="los-section-label">Best Today</p>
+                <p className="mt-2 text-sm font-semibold text-los-text-primary">{lifeOsSnapshot.bestAsset?.symbol ?? '—'}</p>
                 {lifeOsSnapshot.bestAsset && (
-                  <p className="text-xs text-green-600 tabular-nums">{formatPct(lifeOsSnapshot.bestAsset.pct)}</p>
+                  <p className="text-xs text-los-success tabular-nums">{formatPct(lifeOsSnapshot.bestAsset.pct)}</p>
                 )}
               </div>
               <div>
-                <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400">Worst Today</p>
-                <p className="mt-1.5 text-sm font-semibold text-gray-900">
-                  {lifeOsSnapshot.worstAsset?.symbol ?? '—'}
-                </p>
+                <p className="los-section-label">Worst Today</p>
+                <p className="mt-2 text-sm font-semibold text-los-text-primary">{lifeOsSnapshot.worstAsset?.symbol ?? '—'}</p>
                 {lifeOsSnapshot.worstAsset && (
-                  <p className="text-xs text-red-500 tabular-nums">{formatPct(lifeOsSnapshot.worstAsset.pct)}</p>
+                  <p className="text-xs text-los-danger tabular-nums">{formatPct(lifeOsSnapshot.worstAsset.pct)}</p>
                 )}
               </div>
               <div>
-                <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400">Watchlist</p>
-                <p className="mt-1.5 text-2xl font-bold text-gray-900 tabular-nums">
-                  {lifeOsSnapshot.watchlistCount}
-                </p>
-                <p className="text-xs text-gray-500">{lifeOsSnapshot.portfolioCount} in portfolio</p>
+                <p className="los-section-label">Watchlist</p>
+                <p className="mt-2 text-2xl font-bold text-los-text-primary tabular-nums">{lifeOsSnapshot.watchlistCount}</p>
+                <p className="text-xs text-los-text-muted">{lifeOsSnapshot.portfolioCount} in portfolio</p>
               </div>
             </div>
           )}
         </Card>
-      </div>
+      </StrategicSection>
 
-      {/* SECTION 6: Quick Actions */}
-      <div>
-        <SectionHeading title="Quick Actions" />
+      <StrategicSection title="Quick Actions">
         <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
           {[
             { href: '/work', label: 'Add Task', icon: '+' },
@@ -606,74 +503,80 @@ export default function DashboardPage() {
             { href: '/life-os', label: 'Add Business Idea', icon: '💡' },
           ].map((action) => (
             <Link key={action.label} href={action.href} className="block group">
-              <Card className="p-4 text-center transition-all group-hover:border-gray-300 group-hover:shadow-md group-hover:-translate-y-0.5 cursor-pointer">
-                <span className="text-lg font-semibold text-gray-900">{action.icon}</span>
-                <p className="text-xs text-gray-600 mt-1">{action.label}</p>
+              <Card variant="interactive" className="p-4 text-center cursor-pointer group-hover:-translate-y-0.5">
+                <span className="text-lg font-semibold text-los-gold">{action.icon}</span>
+                <p className="text-xs text-los-text-secondary mt-1">{action.label}</p>
               </Card>
             </Link>
           ))}
         </div>
-      </div>
+      </StrategicSection>
 
-      {/* Compact insights & weekly trends (preserved functionality) */}
       {allInsights.length > 0 && (
-        <div>
-          <SectionHeading title="Insights" href="/analytics" linkLabel="View analytics" />
+        <StrategicSection title="Insights" subtitle="Patterns detected from today's activity" href="/analytics" linkLabel="View analytics">
           <div className="space-y-2">
             {allInsights.slice(0, 3).map((insight) => (
-              <Card key={insight.title + '|' + insight.description} className={`p-4 border-l-4 ${insight.type === 'positive' ? 'border-l-green-500' : insight.type === 'negative' ? 'border-l-red-400' : 'border-l-yellow-400'}`}>
-                <p className="font-semibold text-gray-900 text-sm">{insight.title}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{insight.description}</p>
+              <Card
+                key={insight.title + '|' + insight.description}
+                className={`p-4 ${
+                  insight.type === 'positive'
+                    ? 'los-insight-card--positive'
+                    : insight.type === 'negative'
+                      ? 'los-insight-card--negative'
+                      : 'los-insight-card--neutral'
+                }`}
+              >
+                <p className="font-semibold text-los-text-primary text-sm">{insight.title}</p>
+                <p className="text-xs text-los-text-muted mt-1">{insight.description}</p>
               </Card>
             ))}
           </div>
-        </div>
+        </StrategicSection>
       )}
 
       {weeklyReport && (
-        <div>
-          <SectionHeading title="Weekly Trends" href="/analytics" linkLabel="View details" />
-          <Card className="p-4">
+        <StrategicSection title="Weekly Trends" subtitle="Week-over-week performance" href="/analytics" linkLabel="View details">
+          <Card className="p-5">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div>
-                <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400">Focus</p>
-                <p className="mt-1 text-lg font-bold text-gray-900 tabular-nums">
+                <p className="los-section-label">Focus</p>
+                <p className="mt-2 text-lg font-bold text-los-text-primary tabular-nums">
                   {Math.round(weeklyReport.current.totalFocusMinutes / 60 * 10) / 10}h
                   {weeklyReport.focusTrend !== 0 && (
-                    <span className={`ml-1 text-xs font-medium ${weeklyReport.focusTrend > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                    <span className={`ml-1 text-xs font-medium ${weeklyReport.focusTrend > 0 ? 'text-los-success' : 'text-los-danger'}`}>
                       {weeklyReport.focusTrend > 0 ? '↑' : '↓'}{Math.abs(weeklyReport.focusTrend)}%
                     </span>
                   )}
                 </p>
               </div>
               <div>
-                <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400">Score</p>
-                <p className="mt-1 text-lg font-bold text-gray-900 tabular-nums">
+                <p className="los-section-label">Score</p>
+                <p className="mt-2 text-lg font-bold text-los-gold tabular-nums">
                   {weeklyReport.current.avgScore}
                   {weeklyReport.scoreTrend !== 0 && (
-                    <span className={`ml-1 text-xs font-medium ${weeklyReport.scoreTrend > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                    <span className={`ml-1 text-xs font-medium ${weeklyReport.scoreTrend > 0 ? 'text-los-success' : 'text-los-danger'}`}>
                       {weeklyReport.scoreTrend > 0 ? '↑' : '↓'}{Math.abs(weeklyReport.scoreTrend)}
                     </span>
                   )}
                 </p>
               </div>
               <div>
-                <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400">Items Done</p>
-                <p className="mt-1 text-lg font-bold text-gray-900 tabular-nums">
+                <p className="los-section-label">Items Done</p>
+                <p className="mt-2 text-lg font-bold text-los-text-primary tabular-nums">
                   {weeklyReport.current.totalTasksCompleted}
                   {weeklyReport.taskTrend !== 0 && (
-                    <span className={`ml-1 text-xs font-medium ${weeklyReport.taskTrend > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                    <span className={`ml-1 text-xs font-medium ${weeklyReport.taskTrend > 0 ? 'text-los-success' : 'text-los-danger'}`}>
                       {weeklyReport.taskTrend > 0 ? '↑' : '↓'}{Math.abs(weeklyReport.taskTrend)}%
                     </span>
                   )}
                 </p>
               </div>
               <div>
-                <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400">Habit Score</p>
-                <p className="mt-1 text-lg font-bold text-gray-900 tabular-nums">
+                <p className="los-section-label">Habit Score</p>
+                <p className="mt-2 text-lg font-bold text-los-text-primary tabular-nums">
                   {weeklyReport.current.avgHabitScore}
                   {weeklyReport.habitTrend !== 0 && (
-                    <span className={`ml-1 text-xs font-medium ${weeklyReport.habitTrend > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                    <span className={`ml-1 text-xs font-medium ${weeklyReport.habitTrend > 0 ? 'text-los-success' : 'text-los-danger'}`}>
                       {weeklyReport.habitTrend > 0 ? '↑' : '↓'}{Math.abs(weeklyReport.habitTrend)}
                     </span>
                   )}
@@ -681,7 +584,7 @@ export default function DashboardPage() {
               </div>
             </div>
           </Card>
-        </div>
+        </StrategicSection>
       )}
     </div>
   )

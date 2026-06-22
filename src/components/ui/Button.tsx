@@ -2,7 +2,7 @@
 
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger'
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'ai' | 'gold'
 type Size = 'sm' | 'md' | 'lg'
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -13,13 +13,14 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantStyles: Record<Variant, string> = {
   primary:
-    'bg-gray-900 text-white hover:bg-gray-800 shadow-sm',
+    'bg-los-gold text-los-text-inverse hover:bg-los-gold-light shadow-los-card focus:ring-los-gold/50',
+  gold:
+    'bg-los-gold text-los-text-inverse hover:bg-los-gold-light shadow-los-card focus:ring-los-gold/50',
   secondary:
-    'bg-white text-gray-900 border border-gray-200 hover:bg-gray-50 shadow-sm',
-  ghost:
-    'text-gray-500 hover:text-gray-900 hover:bg-gray-100',
-  danger:
-    'bg-red-600 text-white hover:bg-red-700 shadow-sm',
+    'bg-los-bg-card text-los-text-primary border border-los-border hover:border-los-border-gold hover:bg-los-bg-secondary shadow-los-card',
+  ghost: 'text-los-text-secondary hover:text-los-text-primary hover:bg-los-bg-secondary',
+  ai: 'bg-los-ai text-white hover:bg-los-ai-light shadow-los-card focus:ring-los-ai/50',
+  danger: 'bg-los-danger text-white hover:bg-red-500 shadow-los-card focus:ring-los-danger/50',
 }
 
 const sizeStyles: Record<Size, string> = {
@@ -37,7 +38,7 @@ export default function Button({
 }: ButtonProps) {
   return (
     <button
-      className={`inline-flex items-center justify-center rounded-lg font-medium transition-all focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
+      className={`inline-flex items-center justify-center rounded-lg font-medium transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-los-bg-primary disabled:opacity-50 disabled:pointer-events-none ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
       {...props}
     >
       {children}

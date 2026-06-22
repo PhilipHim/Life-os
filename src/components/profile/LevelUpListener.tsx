@@ -3,51 +3,61 @@
 import { useEffect, useState } from 'react'
 import { getTotalXp } from '@/lib/xp'
 import { computeProgress } from '@/lib/profile/progression'
+import Button from '@/components/ui/Button'
+import { CrownIcon, StarIcon } from '@/design-system/icons'
 
 const LEVEL_KEY = 'life_os_last_known_level'
 const INIT_KEY = 'life_os_level_initialized'
 
-function LevelUpModal({ level, onDismiss }: { level: number; onDismiss: () => void }) {
+function LevelUpModal({
+  level,
+  title,
+  onDismiss,
+}: {
+  level: number
+  title: string
+  onDismiss: () => void
+}) {
   return (
     <>
-      <div className="fixed inset-0 z-[60] bg-black/30 backdrop-blur-[2px]" onClick={onDismiss} />
+      <div className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm" onClick={onDismiss} />
       <div className="fixed inset-0 z-[70] flex items-center justify-center p-6 pointer-events-none">
-        <div
-          className="pointer-events-auto w-full max-w-sm rounded-2xl border border-gray-200 bg-white p-8 shadow-xl text-center animate-fade-in"
-          role="dialog"
-          aria-labelledby="level-up-title"
-        >
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400 mb-3">Level Up</p>
-          <h2 id="level-up-title" className="text-2xl font-bold tracking-tight text-gray-900 mb-2">
-            You reached Level {level}
+        <div className="los-level-up-modal" role="dialog" aria-labelledby="level-up-title">
+          <div className="mx-auto mb-5 flex size-20 items-center justify-center">
+            <div className="los-level-emblem" style={{ width: '5rem', height: '5rem' }}>
+              <span className="los-level-emblem-ring" />
+              <span className="font-heading text-3xl font-bold tabular-nums text-los-gold">{level}</span>
+            </div>
+          </div>
+
+          <p className="los-section-label mb-2">Level Up</p>
+          <h2 id="level-up-title" className="font-heading text-2xl font-bold tracking-wide text-los-text-primary">
+            Level {level}
           </h2>
-          <p className="text-sm text-gray-500 mb-8">
+          <div className="mt-2 flex items-center justify-center gap-2">
+            <CrownIcon size={16} className="text-los-gold" />
+            <p className="font-heading text-lg font-medium text-los-gold">{title}</p>
+          </div>
+          <p className="mt-4 text-sm text-los-text-secondary leading-relaxed">
             Consistent progress compounds. Keep building momentum.
           </p>
-          <button
-            type="button"
-            onClick={onDismiss}
-            className="w-full rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-gray-800 transition-colors"
-          >
+
+          <div className="mt-6 flex items-center justify-center gap-1.5 text-xs text-los-text-muted">
+            <StarIcon size={12} className="text-los-gold" />
+            <span>New title unlocked</span>
+          </div>
+
+          <Button variant="gold" className="mt-8 w-full" onClick={onDismiss}>
             Continue
-          </button>
+          </Button>
         </div>
       </div>
-      <style jsx global>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: scale(0.96) translateY(8px); }
-          to { opacity: 1; transform: scale(1) translateY(0); }
-        }
-        .animate-fade-in {
-          animation: fadeIn 0.25s ease-out;
-        }
-      `}</style>
     </>
   )
 }
 
 export default function LevelUpListener() {
-  const [celebrationLevel, setCelebrationLevel] = useState<number | null>(null)
+  const [celebration, setCelebration] = useState<{ level: number; title: string } | null>(null)
 
   useEffect(() => {
     function syncLevel(showCelebration: boolean) {
@@ -62,7 +72,7 @@ export default function LevelUpListener() {
       }
 
       if (showCelebration && progress.level > last) {
-        setCelebrationLevel(progress.level)
+        setCelebration({ level: progress.level, title: progress.title })
       }
 
       localStorage.setItem(LEVEL_KEY, String(progress.level))
@@ -75,12 +85,13 @@ export default function LevelUpListener() {
     return () => window.removeEventListener('xp-updated', onXpUpdated)
   }, [])
 
-  if (celebrationLevel == null) return null
+  if (celebration == null) return null
 
   return (
     <LevelUpModal
-      level={celebrationLevel}
-      onDismiss={() => setCelebrationLevel(null)}
+      level={celebration.level}
+      title={celebration.title}
+      onDismiss={() => setCelebration(null)}
     />
   )
 }

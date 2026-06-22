@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { CompassIcon } from '@/design-system/icons'
 
 const links = [
   { href: '/dashboard', label: 'Dashboard' },
@@ -13,34 +14,48 @@ const links = [
   { href: '/profile', label: 'Profile' },
 ]
 
+function isNavActive(pathname: string, href: string): boolean {
+  if (href === '/') return pathname === '/'
+  return pathname === href || pathname.startsWith(`${href}/`)
+}
+
 export default function Navbar() {
   const pathname = usePathname()
 
   return (
-    <nav className="sticky top-0 z-40 border-b border-gray-200 bg-white/80 backdrop-blur-md">
-      <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-3">
-        <Link href="/" className={`text-sm font-bold transition-colors ${pathname === '/' ? 'text-gray-900' : 'text-gray-900 hover:text-gray-600'}`}>
-          Productivity OS
+    <header className="los-navbar sticky top-0 z-40">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-4 py-3 sm:px-8">
+        <Link href="/" className="los-brand group shrink-0">
+          <span className="los-brand-mark" aria-hidden>
+            <CompassIcon size={20} className="text-los-gold" />
+          </span>
+          <span className="flex flex-col gap-0.5">
+            <span className="font-heading text-lg font-semibold tracking-[0.12em] text-los-text-primary transition-colors group-hover:text-los-gold">
+              Life OS
+            </span>
+            <span className="los-brand-rule" aria-hidden />
+          </span>
         </Link>
-        <div className="flex gap-1">
+
+        <nav
+          className="flex max-w-full items-center gap-0.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          aria-label="Main navigation"
+        >
           {links.map((link) => {
-            const isActive = pathname === link.href
+            const isActive = isNavActive(pathname, link.href)
             return (
               <Link
                 key={link.href}
                 href={link.href}
-                className={
-                  isActive
-                    ? 'rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white shadow-sm'
-                    : 'rounded-lg px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-900'
-                }
+                aria-current={isActive ? 'page' : undefined}
+                className={isActive ? 'los-nav-link los-nav-link--active' : 'los-nav-link'}
               >
                 {link.label}
               </Link>
             )
           })}
-        </div>
+        </nav>
       </div>
-    </nav>
+    </header>
   )
 }

@@ -6,6 +6,7 @@ import Card from '@/components/ui/Card'
 import ChallengeCard from '@/components/challenges/ChallengeCard'
 import { getChallengeState } from '@/lib/challenges'
 import type { ChallengeState } from '@/lib/challenges/types'
+import { MountainIcon, StarIcon } from '@/design-system/icons'
 
 export default function DashboardChallengesCard() {
   const [challenges, setChallenges] = useState<ChallengeState | null>(null)
@@ -30,19 +31,26 @@ export default function DashboardChallengesCard() {
   const available = challenges.dailyXpAvailable
 
   return (
-    <Card className="p-5">
+    <Card variant="gold" className="p-5">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400">Today&apos;s Challenges</p>
-          <p className="mt-1 text-sm text-gray-500">
+          <div className="flex items-center gap-2">
+            <MountainIcon size={14} className="text-los-gold" />
+            <p className="los-section-label">Today&apos;s Challenges</p>
+          </div>
+          <p className="mt-2 text-sm text-los-text-secondary">
             {challenges.dailyCompleted} of {challenges.daily.length} complete
-            <span className="text-gray-400"> · </span>
-            <span className="tabular-nums font-medium text-gray-700">
+            <span className="text-los-text-muted"> · </span>
+            <span className="inline-flex items-center gap-1 tabular-nums font-semibold text-los-gold">
+              <StarIcon size={12} />
               +{earned}/{available} XP
             </span>
           </p>
         </div>
-        <Link href="/profile" className="text-xs text-gray-500 hover:text-gray-900 transition-colors shrink-0">
+        <Link
+          href="/profile"
+          className="text-xs text-los-gold hover:text-los-gold-light transition-colors shrink-0"
+        >
           View all →
         </Link>
       </div>

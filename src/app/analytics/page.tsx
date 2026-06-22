@@ -27,9 +27,14 @@ import {
   type FinanceAnalytics,
 } from '@/lib/life-analytics'
 import { computeLifeScore } from '@/lib/life-score'
+import AnalyticsSection, { StatCard, TrendBadge, TrendHighlightCard } from '@/components/analytics/AnalyticsSection'
+import { LevelProgressPanel, XpStatCard } from '@/components/progression'
+import { DayTrendCard } from '@/components/strategic'
+import { CompassIcon } from '@/design-system/icons'
+import { losClasses } from '@/design-system/tokens'
 import Card from '@/components/ui/Card'
+import ProgressBar from '@/components/ui/ProgressBar'
 import MiniBarChart from '@/components/analytics/MiniBarChart'
-import AnalyticsSection, { StatCard, TrendBadge } from '@/components/analytics/AnalyticsSection'
 import AIWeeklyReviewCard from '@/components/analytics/AIWeeklyReviewCard'
 import { generateWeeklyReviewAsync, buildWeeklyReviewSnapshot, type WeeklyReview } from '@/lib/weekly-review'
 import { generateMonthlyReviewAsync, buildMonthlyReviewSnapshot, type MonthlyReview } from '@/lib/monthly-review'
@@ -557,30 +562,40 @@ export default function AnalyticsPage() {
 
   if (!c.hasData) {
     return (
-      <div className="space-y-10">
-        <div className="space-y-2">
-          <h1 className="text-4xl font-bold tracking-tight">Analytics</h1>
-          <p className="text-gray-500">Complete Life OS overview — productivity, health, sleep, character &amp; finance</p>
-        </div>
+      <div className={`${losClasses.page} space-y-10`}>
+        <header className={losClasses.pageHeader}>
+          <div className="flex items-center gap-3">
+            <CompassIcon size={28} className="text-los-gold" />
+            <h1 className={losClasses.pageTitle}>Analytics</h1>
+          </div>
+          <p className={losClasses.pageSubtitle}>
+            Complete Life OS overview — productivity, health, sleep, character &amp; finance
+          </p>
+        </header>
         <Card>
-          <p className="text-gray-400 py-8 text-center">No data yet. Start using the app to see your analytics.</p>
+          <p className="text-los-text-muted py-8 text-center">No data yet. Start using the app to see your analytics.</p>
         </Card>
       </div>
     )
   }
 
   return (
-    <div className="space-y-10">
-      <div className="space-y-2">
-        <h1 className="text-4xl font-bold tracking-tight">Analytics</h1>
-        <p className="text-gray-500">Complete Life OS overview — productivity, health, sleep, character &amp; finance</p>
-      </div>
+    <div className={`${losClasses.page} space-y-12`}>
+      <header className={losClasses.pageHeader}>
+        <div className="flex items-center gap-3">
+          <CompassIcon size={28} className="text-los-gold" />
+          <h1 className={losClasses.pageTitle}>Analytics</h1>
+        </div>
+        <p className={losClasses.pageSubtitle}>
+          Strategic intelligence — productivity, health, sleep, character &amp; finance
+        </p>
+      </header>
 
       <LifeIntelligenceSection report={lifeIntelligence} />
 
       {weeklyReviewLoading && !weeklyReview && (
-        <Card className="p-8 text-center ring-1 ring-indigo-500/10">
-          <p className="text-sm text-gray-500">Generating your AI Weekly Review…</p>
+        <Card variant="ai" className="p-8 text-center los-ai-surface">
+          <p className="text-sm text-los-ai">Generating your AI Weekly Review…</p>
         </Card>
       )}
       {weeklyReview && (
@@ -593,8 +608,8 @@ export default function AnalyticsPage() {
       )}
 
       {monthlyReviewLoading && !monthlyReview && (
-        <Card className="p-8 text-center ring-1 ring-violet-500/10">
-          <p className="text-sm text-gray-500">Generating your AI Monthly Review…</p>
+        <Card variant="ai" className="p-8 text-center los-ai-surface">
+          <p className="text-sm text-los-ai">Generating your AI Monthly Review…</p>
         </Card>
       )}
       {monthlyReview && (
@@ -613,58 +628,55 @@ export default function AnalyticsPage() {
           hasData={xpAnalytics.hasData}
           emptyMessage="Complete tasks, habits, and Life OS activities to earn XP."
         >
+          <LevelProgressPanel progress={xpAnalytics.progress} />
+
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-3">
-            <StatCard
-              label="Current Level"
-              value={String(xpAnalytics.progress.level)}
-              sublabel={xpAnalytics.progress.title}
-            />
-            <StatCard
+            <XpStatCard
               label="Total XP"
               value={xpAnalytics.progress.totalXp.toLocaleString()}
               sublabel={`Level ${xpAnalytics.progress.level + 1} at ${xpAnalytics.nextLevelAt.toLocaleString()} XP`}
+              highlight
             />
-            <StatCard
+            <XpStatCard
               label="XP to Next Level"
               value={xpAnalytics.xpRemaining.toLocaleString()}
               sublabel={`${xpAnalytics.progress.progressPct}% complete`}
             />
-            <StatCard
+            <XpStatCard
               label="XP This Week"
               value={`+${xpAnalytics.history.weekly}`}
               sublabel={`Today +${xpAnalytics.history.daily} · Month +${xpAnalytics.history.monthly}`}
             />
+            <XpStatCard
+              label="This Level"
+              value={`${xpAnalytics.progress.currentXp.toLocaleString()} / ${xpAnalytics.progress.xpToNextLevel.toLocaleString()}`}
+              sublabel="XP toward next level"
+            />
           </div>
+
           <Card className="p-4 mb-3">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400">
-                Level Progress
-              </p>
-              <p className="text-xs text-gray-500 tabular-nums">
-                {xpAnalytics.progress.currentXp.toLocaleString()} / {xpAnalytics.progress.xpToNextLevel.toLocaleString()} XP
+            <div className="flex items-center justify-between mb-3">
+              <p className="los-section-label">Level Progress</p>
+              <p className="text-xs font-medium tabular-nums text-los-gold">
+                {xpAnalytics.progress.progressPct}%
               </p>
             </div>
-            <div className="h-2.5 rounded-full bg-gray-100 overflow-hidden">
-              <div
-                className="h-full rounded-full bg-gray-900 transition-all duration-500"
-                style={{ width: `${xpAnalytics.progress.progressPct}%` }}
-              />
-            </div>
+            <ProgressBar value={xpAnalytics.progress.progressPct} variant="gold" size="lg" />
+            <p className="mt-2 text-xs text-los-text-muted tabular-nums">
+              {xpAnalytics.progress.currentXp.toLocaleString()} / {xpAnalytics.progress.xpToNextLevel.toLocaleString()} XP
+            </p>
           </Card>
+
           <div className="grid gap-3 lg:grid-cols-2">
             <Card className="p-4">
-              <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400 mb-3">
-                XP Growth (7 days)
-              </p>
+              <p className="los-section-label mb-3">XP Growth (7 days)</p>
               <MiniBarChart
                 data={xpAnalytics.xpGrowthWeek.map((p) => ({ label: p.label, value: p.value }))}
                 max={Math.max(20, ...xpAnalytics.xpGrowthWeek.map((p) => p.value), 1)}
               />
             </Card>
             <Card className="p-4">
-              <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400 mb-3">
-                XP Growth (30 days)
-              </p>
+              <p className="los-section-label mb-3">XP Growth (30 days)</p>
               <MiniBarChart
                 data={xpAnalytics.xpGrowthMonth.filter((_, i) => i % 5 === 0).map((p) => ({
                   label: p.label,
@@ -677,87 +689,116 @@ export default function AnalyticsPage() {
         </AnalyticsSection>
       )}
 
-      <section>
-        <div className="mb-4">
-          <h2 className="text-sm font-semibold uppercase tracking-widest text-gray-400">Life Overview</h2>
-          <p className="text-sm text-gray-500 mt-0.5">Weekly Life Score trend</p>
-        </div>
+      <AnalyticsSection title="Life Overview" subtitle="Weekly Life Score trend">
         <div className="grid gap-3 sm:grid-cols-7 mb-4">
           {c.lifeWeekScores.map((d) => (
-            <Card key={d.date} className="p-3 text-center">
-              <p className="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1">{d.dayLabel}</p>
-              <p className={`text-xl font-bold ${d.total >= 70 ? 'text-green-600' : d.total >= 40 ? 'text-yellow-600' : 'text-red-500'}`}>{d.total}</p>
-              <p className="text-xs text-gray-400 mt-0.5">life</p>
-            </Card>
+            <DayTrendCard key={d.date} dayLabel={d.dayLabel} score={d.total} meta={['life']} />
           ))}
         </div>
         <div className="grid gap-4 sm:grid-cols-4 mb-4">
-          <StatCard label="Weekly Average" value={`${c.lifeWeeklyAvg}/100`} />
-          {c.lifeBestDay && <StatCard label="Best Day" value={String(c.lifeBestDay.total)} sublabel={c.lifeBestDay.dayLabel} valueClassName="text-green-600" />}
-          {c.lifeWorstDay && c.lifeWorstDay.dayLabel !== c.lifeBestDay?.dayLabel && (
-            <StatCard label="Lowest Day" value={String(c.lifeWorstDay.total)} sublabel={c.lifeWorstDay.dayLabel} valueClassName="text-red-500" />
+          <StatCard label="Weekly Average" value={`${c.lifeWeeklyAvg}/100`} highlight />
+          {c.lifeBestDay && (
+            <StatCard
+              label="Best Day"
+              value={String(c.lifeBestDay.total)}
+              sublabel={c.lifeBestDay.dayLabel}
+              valueClassName="text-los-success"
+            />
           )}
-          <StatCard label="Mind Trend" value={c.mindTrend != null ? `${c.mindTrend > 0 ? '+' : ''}${c.mindTrend}%` : '—'} trend={c.mindTrend} />
+          {c.lifeWorstDay && c.lifeWorstDay.dayLabel !== c.lifeBestDay?.dayLabel && (
+            <StatCard
+              label="Lowest Day"
+              value={String(c.lifeWorstDay.total)}
+              sublabel={c.lifeWorstDay.dayLabel}
+              valueClassName="text-los-danger"
+            />
+          )}
+          <StatCard
+            label="Mind Trend"
+            value={c.mindTrend != null ? `${c.mindTrend > 0 ? '+' : ''}${c.mindTrend}%` : '—'}
+            trend={c.mindTrend}
+          />
         </div>
         {c.lifeInsights.length > 0 && (
           <Card className="p-4">
             <ul className="space-y-1.5">
               {c.lifeInsights.map((insight) => (
-                <li key={insight} className="flex items-start gap-2 text-sm text-gray-700">
-                  <span className="text-blue-500 mt-0.5 shrink-0">•</span>
+                <li key={insight} className="flex items-start gap-2 text-sm text-los-text-secondary">
+                  <span className="text-los-gold mt-0.5 shrink-0">◇</span>
                   <span>{insight}</span>
                 </li>
               ))}
             </ul>
           </Card>
         )}
-      </section>
+      </AnalyticsSection>
 
       <AnalyticsSection title="Productivity Analytics" subtitle="Weekly performance, focus & work output">
         <div className="grid gap-3 sm:grid-cols-7 mb-3">
           {c.weekDays.map((d) => (
-            <Card key={d.date} className="p-3 text-center">
-              <p className="text-[10px] font-medium uppercase tracking-wider text-gray-400 mb-1">{d.dayLabel}</p>
-              <p className={`text-xl font-bold tabular-nums ${d.score >= 70 ? 'text-green-600' : d.score >= 40 ? 'text-yellow-600' : 'text-red-500'}`}>{d.score}</p>
-              <p className="text-[10px] text-gray-400 mt-0.5">{minsStr(d.focusMinutes)} focus</p>
-              <p className="text-[10px] text-gray-400">{d.tasksCompleted} tasks</p>
-            </Card>
+            <DayTrendCard
+              key={d.date}
+              dayLabel={d.dayLabel}
+              score={d.score}
+              meta={[`${minsStr(d.focusMinutes)} focus`, `${d.tasksCompleted} tasks`]}
+            />
           ))}
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-3">
-          <StatCard label="Weekly Avg Score" value={`${c.weeklyAvgScore}/100`} />
+          <StatCard label="Weekly Avg Score" value={`${c.weeklyAvgScore}/100`} highlight />
           <StatCard label="Total Focus" value={minsStr(c.totalFocusMinutes)} />
           <StatCard label="Tasks Done" value={String(c.totalTasks)} />
-          <StatCard label="Completion Rate" value={`${c.completionRate}%`} valueClassName={c.completionRate >= 70 ? 'text-green-600' : c.completionRate >= 40 ? 'text-yellow-600' : 'text-red-500'} />
+          <StatCard
+            label="Completion Rate"
+            value={`${c.completionRate}%`}
+            valueClassName={
+              c.completionRate >= 70
+                ? 'text-los-success'
+                : c.completionRate >= 40
+                  ? 'text-los-warning'
+                  : 'text-los-danger'
+            }
+          />
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard label="Focus Sessions" value={String(c.focusSessions)} sublabel={`Avg ${c.avgSessionMinutes} min`} />
-          <StatCard label="Longest Session" value={c.longestSessionMs > 0 ? minsStr(Math.round(c.longestSessionMs / 60000)) : '—'} sublabel={c.longestSessionDate || undefined} />
+          <StatCard
+            label="Longest Session"
+            value={c.longestSessionMs > 0 ? minsStr(Math.round(c.longestSessionMs / 60000)) : '—'}
+            sublabel={c.longestSessionDate || undefined}
+          />
           <StatCard label="Build Habits Today" value={`${c.habitBuildDone}/${c.habitBuildTotal}`} />
-          <StatCard label="Habit Streak" value={`${c.habitCurrentStreak} days`} sublabel={`Best: ${c.habitLongestStreak} days`} />
+          <StatCard
+            label="Habit Streak"
+            value={`${c.habitCurrentStreak} days`}
+            sublabel={`Best: ${c.habitLongestStreak} days`}
+          />
         </div>
         {(c.bestDay || c.mostFocusedDay) && (
           <div className="grid gap-3 sm:grid-cols-3 mt-3">
             {c.bestDay && (
-              <Card className="p-4">
-                <p className="text-[10px] font-medium uppercase tracking-wider text-green-600 mb-1">Best Day</p>
-                <p className="text-lg font-bold text-gray-900">{c.bestDay.dayLabel}</p>
-                <p className="text-sm text-gray-500">Score {c.bestDay.score} · {minsStr(c.bestDay.focusMinutes)} focus</p>
-              </Card>
+              <TrendHighlightCard
+                label="Best Day"
+                title={c.bestDay.dayLabel}
+                detail={`Score ${c.bestDay.score} · ${minsStr(c.bestDay.focusMinutes)} focus`}
+                tone="success"
+              />
             )}
             {c.mostFocusedDay && (
-              <Card className="p-4">
-                <p className="text-[10px] font-medium uppercase tracking-wider text-blue-600 mb-1">Most Focused</p>
-                <p className="text-lg font-bold text-gray-900">{c.mostFocusedDay.dayLabel}</p>
-                <p className="text-sm text-gray-500">{minsStr(c.mostFocusedDay.focusMinutes)} of deep work</p>
-              </Card>
+              <TrendHighlightCard
+                label="Most Focused"
+                title={c.mostFocusedDay.dayLabel}
+                detail={`${minsStr(c.mostFocusedDay.focusMinutes)} of deep work`}
+                tone="ai"
+              />
             )}
             {c.worstDay && c.worstDay !== c.bestDay && (
-              <Card className="p-4">
-                <p className="text-[10px] font-medium uppercase tracking-wider text-red-500 mb-1">Lowest Day</p>
-                <p className="text-lg font-bold text-gray-900">{c.worstDay.dayLabel}</p>
-                <p className="text-sm text-gray-500">Score {c.worstDay.score}</p>
-              </Card>
+              <TrendHighlightCard
+                label="Lowest Day"
+                title={c.worstDay.dayLabel}
+                detail={`Score ${c.worstDay.score}`}
+                tone="danger"
+              />
             )}
           </div>
         )}
@@ -772,42 +813,56 @@ export default function AnalyticsPage() {
         </div>
         <div className="grid gap-3 lg:grid-cols-3">
           <Card className="p-4">
-            <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400 mb-3">Sleep Score (7 days)</p>
+            <p className="los-section-label mb-3">Sleep Score (7 days)</p>
             <MiniBarChart data={c.sleep.weekTrend.map((p) => ({ label: p.label, value: p.value }))} max={100} />
           </Card>
           <Card className="p-4">
-            <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400 mb-3">REM % (<TrendBadge value={c.sleep.remTrendPct} />)</p>
-            <MiniBarChart data={c.sleep.remWeekTrend.map((p) => ({ label: p.label, value: p.value }))} max={40} unit="%" colorClass="bg-indigo-500" />
+            <p className="los-section-label mb-3">
+              REM % (<TrendBadge value={c.sleep.remTrendPct} />)
+            </p>
+            <MiniBarChart
+              data={c.sleep.remWeekTrend.map((p) => ({ label: p.label, value: p.value }))}
+              max={40}
+              unit="%"
+              variant="ai"
+            />
           </Card>
           <Card className="p-4">
-            <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400 mb-3">Deep Sleep % (<TrendBadge value={c.sleep.deepTrendPct} />)</p>
-            <MiniBarChart data={c.sleep.deepWeekTrend.map((p) => ({ label: p.label, value: p.value }))} max={30} unit="%" colorClass="bg-violet-600" />
+            <p className="los-section-label mb-3">
+              Deep Sleep % (<TrendBadge value={c.sleep.deepTrendPct} />)
+            </p>
+            <MiniBarChart
+              data={c.sleep.deepWeekTrend.map((p) => ({ label: p.label, value: p.value }))}
+              max={30}
+              unit="%"
+              variant="ai"
+            />
           </Card>
         </div>
       </AnalyticsSection>
 
       <AnalyticsSection title="Health Analytics" subtitle="Health score, wellness trends & illness tracking" hasData={c.healthAnalytics.hasData} emptyMessage="No health data yet. Log health in Life OS." insights={c.healthAnalytics.insights}>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-3">
-          <StatCard label="Avg Health Score" value={c.healthAnalytics.avgScore != null ? `${c.healthAnalytics.avgScore}/100` : '—'} trend={c.healthAnalytics.scoreTrendPct} valueClassName={c.healthAnalytics.avgScore != null && c.healthAnalytics.avgScore >= 60 ? 'text-green-600' : 'text-gray-900'} />
-          <StatCard label="Days Without Illness" value={c.healthAnalytics.isSick ? '0' : String(c.healthAnalytics.daysWithoutIllness)} sublabel={c.healthAnalytics.isSick ? 'Currently sick' : 'Healthy streak'} valueClassName={c.healthAnalytics.isSick ? 'text-red-500' : 'text-green-600'} />
+          <StatCard label="Avg Health Score" value={c.healthAnalytics.avgScore != null ? `${c.healthAnalytics.avgScore}/100` : '—'} trend={c.healthAnalytics.scoreTrendPct} valueClassName={c.healthAnalytics.avgScore != null && c.healthAnalytics.avgScore >= 60 ? 'text-los-success' : 'text-los-text-primary'} />
+          <StatCard label="Days Without Illness" value={c.healthAnalytics.isSick ? '0' : String(c.healthAnalytics.daysWithoutIllness)} sublabel={c.healthAnalytics.isSick ? 'Currently sick' : 'Healthy streak'} valueClassName={c.healthAnalytics.isSick ? 'text-los-danger' : 'text-los-success'} />
           <StatCard label="Avg Steps" value={c.avgSteps?.toLocaleString() ?? '—'} sublabel="This week" />
           <StatCard label="Avg Water" value={c.avgWater != null ? `${c.avgWater} L` : '—'} sublabel="This week" />
         </div>
         <div className="grid gap-3 lg:grid-cols-2">
           <Card className="p-4">
-            <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400 mb-3">Health Score Trend</p>
+            <p className="los-section-label mb-3">Health Score Trend</p>
             <MiniBarChart data={c.healthAnalytics.weekScores.map((p) => ({ label: p.label, value: p.value }))} max={100} colorClass="bg-green-600" />
           </Card>
           <Card className="p-4">
-            <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400 mb-3">Water Intake (L)</p>
+            <p className="los-section-label mb-3">Water Intake (L)</p>
             <MiniBarChart data={c.healthAnalytics.waterTrend.map((p) => ({ label: p.label, value: p.value }))} max={3} colorClass="bg-blue-500" />
           </Card>
           <Card className="p-4">
-            <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400 mb-3">Exercise (min)</p>
+            <p className="los-section-label mb-3">Exercise (min)</p>
             <MiniBarChart data={c.healthAnalytics.exerciseTrend.map((p) => ({ label: p.label, value: p.value }))} max={60} colorClass="bg-orange-500" />
           </Card>
           <Card className="p-4">
-            <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400 mb-3">Healthy Eating (/10)</p>
+            <p className="los-section-label mb-3">Healthy Eating (/10)</p>
             <MiniBarChart data={c.healthAnalytics.nutritionTrend.map((p) => ({ label: p.label, value: p.value }))} max={10} colorClass="bg-emerald-600" />
           </Card>
         </div>
@@ -815,13 +870,13 @@ export default function AnalyticsPage() {
 
       <AnalyticsSection title="Character Analytics" subtitle="Personal development & trait progression" hasData={c.character.hasData} emptyMessage="No character traits yet. Add traits in Life OS." insights={c.character.insights}>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-3">
-          {c.character.bestImproving && <StatCard label="Strongest Trait" value={c.character.bestImproving.name} sublabel={`Level ${c.character.bestImproving.level}/10`} valueClassName="text-green-600" />}
-          {c.character.weakest && <StatCard label="Weakest Trait" value={c.character.weakest.name} sublabel={`Level ${c.character.weakest.level}/10`} valueClassName="text-amber-600" />}
+          {c.character.bestImproving && <StatCard label="Strongest Trait" value={c.character.bestImproving.name} sublabel={`Level ${c.character.bestImproving.level}/10`} valueClassName="text-los-success" />}
+          {c.character.weakest && <StatCard label="Weakest Trait" value={c.character.weakest.name} sublabel={`Level ${c.character.weakest.level}/10`} valueClassName="text-los-warning" />}
           <StatCard label="Monthly Growth" value={`+${c.character.monthlyGrowth}`} sublabel="Levels gained from baseline" />
           <StatCard label="Updated This Month" value={String(c.character.traitsUpdatedThisMonth)} sublabel={`${c.character.traits.length} active traits`} />
         </div>
         <Card className="p-4">
-          <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400 mb-4">Trait Progression</p>
+          <p className="los-section-label mb-4">Trait Progression</p>
           <div className="space-y-3">
             {[...c.character.traits].sort((a, b) => b.level - a.level).map((trait) => (
               <div key={trait.name}>
@@ -840,7 +895,7 @@ export default function AnalyticsPage() {
 
       <AnalyticsSection title="Finance Analytics" subtitle="Portfolio & watchlist performance" hasData={c.finance.hasData} emptyMessage="No finance data yet. Add stocks in Life OS." insights={c.finance.insights}>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-3">
-          <StatCard label="Portfolio Today" value={`${c.finance.portfolioDailyPct >= 0 ? '+' : ''}${c.finance.portfolioDailyPct.toFixed(2)}%`} valueClassName={c.finance.portfolioDailyPct >= 0 ? 'text-green-600' : 'text-red-500'} />
+          <StatCard label="Portfolio Today" value={`${c.finance.portfolioDailyPct >= 0 ? '+' : ''}${c.finance.portfolioDailyPct.toFixed(2)}%`} valueClassName={c.finance.portfolioDailyPct >= 0 ? 'text-los-success' : 'text-los-danger'} highlight />
           <StatCard label="Portfolio Week" value={`${c.finance.portfolioWeekPct >= 0 ? '+' : ''}${c.finance.portfolioWeekPct.toFixed(2)}%`} />
           <StatCard label="Portfolio Month" value={`${c.finance.portfolioMonthPct >= 0 ? '+' : ''}${c.finance.portfolioMonthPct.toFixed(2)}%`} />
           <StatCard label="Watchlist Today" value={`${c.finance.watchlistDailyPct >= 0 ? '+' : ''}${c.finance.watchlistDailyPct.toFixed(2)}%`} sublabel={`${c.finance.portfolioCount} held · ${c.finance.watchlistCount} watching`} />

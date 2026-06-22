@@ -1,19 +1,705 @@
 @import "tailwindcss";
 
+/* ─── Life OS Design System ─────────────────────────────────────────────── */
+
 :root {
-  --background: #f9fafb;
-  --foreground: #111827;
+  --los-bg-primary: #0b1020;
+  --los-bg-secondary: #12182d;
+  --los-bg-card: #1a223d;
+
+  --los-gold: #d4af37;
+  --los-gold-light: #e5c76b;
+  --los-gold-dark: #9a7b28;
+
+  --los-ai: #8b5cf6;
+  --los-ai-light: #a78bfa;
+
+  --los-success: #10b981;
+  --los-warning: #f59e0b;
+  --los-danger: #ef4444;
+
+  --los-text-primary: #e8ecf4;
+  --los-text-secondary: #9aa8c7;
+  --los-text-muted: #6b7a99;
+  --los-text-inverse: #0b1020;
+
+  --los-border: rgba(255, 255, 255, 0.1);
+  --los-border-subtle: rgba(255, 255, 255, 0.06);
+  --los-border-gold: rgba(212, 175, 55, 0.35);
+  --los-border-ai: rgba(139, 92, 246, 0.35);
+
+  --los-shadow-card: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 4px 24px -4px rgba(0, 0, 0, 0.45);
+  --los-shadow-card-hover: 0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 8px 32px -4px rgba(0, 0, 0, 0.55);
+  --los-shadow-elevated: 0 12px 40px -8px rgba(0, 0, 0, 0.6);
+
+  --los-gradient-gold-progress: linear-gradient(
+    90deg,
+    var(--los-gold-dark) 0%,
+    var(--los-gold) 50%,
+    var(--los-gold-light) 100%
+  );
+
+  --los-layout-max: 72rem;
+  --los-layout-gutter: 2rem;
+  --los-section-gap: 3rem;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Backgrounds */
+  --color-los-bg-primary: var(--los-bg-primary);
+  --color-los-bg-secondary: var(--los-bg-secondary);
+  --color-los-bg-card: var(--los-bg-card);
+
+  /* Accents */
+  --color-los-gold: var(--los-gold);
+  --color-los-gold-light: var(--los-gold-light);
+  --color-los-gold-dark: var(--los-gold-dark);
+  --color-los-ai: var(--los-ai);
+  --color-los-ai-light: var(--los-ai-light);
+
+  /* Semantic */
+  --color-los-success: var(--los-success);
+  --color-los-warning: var(--los-warning);
+  --color-los-danger: var(--los-danger);
+
+  /* Text */
+  --color-los-text-primary: var(--los-text-primary);
+  --color-los-text-secondary: var(--los-text-secondary);
+  --color-los-text-muted: var(--los-text-muted);
+  --color-los-text-inverse: var(--los-text-inverse);
+
+  /* Borders */
+  --color-los-border: var(--los-border);
+  --color-los-border-subtle: var(--los-border-subtle);
+  --color-los-border-gold: var(--los-border-gold);
+  --color-los-border-ai: var(--los-border-ai);
+
+  /* Shadows */
+  --shadow-los-card: var(--los-shadow-card);
+  --shadow-los-card-hover: var(--los-shadow-card-hover);
+  --shadow-los-elevated: var(--los-shadow-elevated);
+
+  /* Typography */
+  --font-heading: var(--font-cinzel), ui-serif, Georgia, serif;
+  --font-body: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-body);
 }
 
+/* ─── Base ───────────────────────────────────────────────────────────────── */
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  background: var(--los-bg-primary);
+  color: var(--los-text-primary);
+  font-family: var(--font-body);
+}
+
+/* ─── App shell & layout ─────────────────────────────────────────────────── */
+
+.los-app-shell {
+  background-color: var(--los-bg-primary);
+  background-image:
+    radial-gradient(ellipse 90% 55% at 50% -15%, rgba(212, 175, 55, 0.07), transparent 55%),
+    radial-gradient(ellipse 50% 40% at 100% 0%, rgba(26, 34, 61, 0.65), transparent),
+    radial-gradient(ellipse 40% 35% at 0% 100%, rgba(18, 24, 45, 0.8), transparent);
+}
+
+.los-main {
+  position: relative;
+}
+
+.los-main::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-top: 1px solid var(--los-border-subtle);
+}
+
+.los-main > * {
+  position: relative;
+}
+
+/* ─── Navbar — command center ───────────────────────────────────────────── */
+
+.los-navbar {
+  position: relative;
+  border-bottom: 1px solid var(--los-border);
+  background: linear-gradient(
+    180deg,
+    var(--los-bg-secondary) 0%,
+    rgba(18, 24, 45, 0.98) 100%
+  );
+  box-shadow: var(--los-shadow-elevated);
+}
+
+.los-navbar::before {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 1px;
+  background: var(--los-gradient-gold-progress);
+  opacity: 0.45;
+}
+
+.los-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  text-decoration: none;
+}
+
+.los-brand-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.625rem;
+  border: 1px solid var(--los-border-gold);
+  background: var(--los-bg-card);
+  box-shadow: var(--los-shadow-card);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.los-brand:hover .los-brand-mark {
+  border-color: var(--los-gold);
+  box-shadow: var(--los-shadow-card-hover);
+  transform: translateY(-1px);
+}
+
+.los-brand-rule {
+  display: block;
+  width: 2.5rem;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--los-gradient-gold-progress);
+  opacity: 0.85;
+  transition: width 0.25s ease, opacity 0.2s ease;
+}
+
+.los-brand:hover .los-brand-rule {
+  width: 3.25rem;
+  opacity: 1;
+}
+
+.los-nav-link {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  padding: 0.5rem 0.875rem;
+  border-radius: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--los-text-secondary);
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition:
+    color 0.2s ease,
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.los-nav-link:hover {
+  color: var(--los-text-primary);
+  background-color: rgba(255, 255, 255, 0.04);
+  border-color: var(--los-border-subtle);
+}
+
+.los-nav-link--active {
+  color: var(--los-gold);
+  background: linear-gradient(
+    180deg,
+    rgba(212, 175, 55, 0.14) 0%,
+    rgba(212, 175, 55, 0.06) 100%
+  );
+  border-color: var(--los-border-gold);
+  box-shadow:
+    inset 0 -2px 0 var(--los-gold),
+    var(--los-shadow-card);
+}
+
+.los-nav-link--active:hover {
+  color: var(--los-gold-light);
+  background: linear-gradient(
+    180deg,
+    rgba(212, 175, 55, 0.18) 0%,
+    rgba(212, 175, 55, 0.08) 100%
+  );
+}
+
+/* ─── Page rhythm (opt-in on page roots) ────────────────────────────────── */
+
+.los-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--los-section-gap);
+}
+
+.los-page-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--los-border-subtle);
+}
+
+.los-page-section + .los-page-section {
+  padding-top: 0.25rem;
+}
+
+.font-heading {
+  font-family: var(--font-heading);
+}
+
+.font-body {
+  font-family: var(--font-body);
+}
+
+/* ─── Reusable patterns (migrate pages incrementally) ───────────────────── */
+
+.los-page-title {
+  font-family: var(--font-heading);
+  font-size: 2.25rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--los-text-primary);
+}
+
+.los-section-heading {
+  font-family: var(--font-heading);
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: 0.025em;
+  color: var(--los-text-primary);
+}
+
+.los-section-label {
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--los-text-muted);
+}
+
+.los-progress-gold {
+  background: var(--los-gradient-gold-progress);
+}
+
+.los-card-gold-accent {
+  border-color: var(--los-border-gold);
+  box-shadow: var(--los-shadow-card), 0 0 0 1px rgba(212, 175, 55, 0.06);
+}
+
+.los-card-ai-accent {
+  border-color: var(--los-border-ai);
+  box-shadow: var(--los-shadow-card), 0 0 0 1px rgba(139, 92, 246, 0.08);
+}
+
+/* ─── Progression (XP, levels, achievements, titles, challenges) ───────── */
+
+.los-progression-section-rule {
+  display: block;
+  margin-top: 0.75rem;
+  height: 1px;
+  width: 4rem;
+  background: linear-gradient(90deg, var(--los-gold) 0%, transparent 100%);
+}
+
+.los-level-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  border: 1px solid var(--los-border-gold);
+  background: linear-gradient(
+    135deg,
+    var(--los-bg-card) 0%,
+    rgba(26, 34, 61, 0.95) 55%,
+    rgba(154, 123, 40, 0.1) 100%
+  );
+  padding: 2rem;
+  box-shadow: var(--los-shadow-card), 0 0 40px -12px rgba(212, 175, 55, 0.18);
+}
+
+.los-level-emblem {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 6rem;
+  height: 6rem;
+  flex-shrink: 0;
+}
+
+.los-level-emblem-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 1rem;
+  border: 2px solid var(--los-border-gold);
+  background: radial-gradient(circle at 50% 30%, rgba(212, 175, 55, 0.18) 0%, transparent 70%);
+  box-shadow: 0 0 24px -4px rgba(212, 175, 55, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.los-progression-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  padding: 0.125rem 0.625rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--los-text-muted);
+  border: 1px solid var(--los-border-subtle);
+}
+
+.los-progression-badge--gold {
+  background: rgba(212, 175, 55, 0.12);
+  color: var(--los-gold);
+  border-color: var(--los-border-gold);
+}
+
+.los-progression-badge--muted {
+  background: transparent;
+  color: var(--los-text-muted);
+  border-color: var(--los-border-subtle);
+}
+
+.los-xp-stat-card {
+  background: linear-gradient(180deg, var(--los-bg-card) 0%, rgba(26, 34, 61, 0.85) 100%);
+}
+
+.los-achievement-card {
+  border-radius: 0.75rem;
+  border: 1px solid var(--los-border);
+  padding: 1.25rem;
+  transition: box-shadow 0.2s ease;
+}
+
+.los-achievement-card--unlocked {
+  border-color: var(--los-border-gold);
+  background: linear-gradient(145deg, rgba(212, 175, 55, 0.1) 0%, var(--los-bg-card) 45%);
+  box-shadow: var(--los-shadow-card), 0 0 32px -12px rgba(212, 175, 55, 0.22);
+}
+
+.los-achievement-card--locked {
+  border-style: dashed;
+  border-color: var(--los-border-subtle);
+  background: rgba(18, 24, 45, 0.45);
+}
+
+.los-achievement-icon {
+  display: flex;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.625rem;
+}
+
+.los-achievement-icon--unlocked {
+  background: linear-gradient(135deg, var(--los-gold-dark) 0%, var(--los-gold) 100%);
+  box-shadow: 0 4px 12px -2px rgba(212, 175, 55, 0.45);
+}
+
+.los-achievement-icon--locked {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--los-border-subtle);
+}
+
+.los-title-card {
+  border-radius: 0.75rem;
+  border: 1px solid var(--los-border);
+  padding: 1.25rem;
+}
+
+.los-title-card--active {
+  border: 2px solid var(--los-gold);
+  background: linear-gradient(145deg, rgba(212, 175, 55, 0.14) 0%, var(--los-bg-card) 55%);
+  box-shadow: var(--los-shadow-card), 0 0 40px -8px rgba(212, 175, 55, 0.28);
+}
+
+.los-title-card--unlocked {
+  border-color: var(--los-border-gold);
+  background: var(--los-bg-card);
+  box-shadow: var(--los-shadow-card);
+}
+
+.los-title-card--locked {
+  border-style: dashed;
+  border-color: var(--los-border-subtle);
+  background: rgba(18, 24, 45, 0.4);
+}
+
+.los-title-icon {
+  display: flex;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  background: rgba(212, 175, 55, 0.1);
+  border: 1px solid var(--los-border-gold);
+}
+
+.los-challenge-card {
+  border-radius: 0.75rem;
+  border: 1px solid var(--los-border);
+  padding: 1.25rem;
+  background: var(--los-bg-card);
+  box-shadow: var(--los-shadow-card);
+}
+
+.los-challenge-card--completed {
+  border-color: rgba(16, 185, 129, 0.35);
+  background: linear-gradient(145deg, rgba(16, 185, 129, 0.1) 0%, var(--los-bg-card) 55%);
+}
+
+.los-challenge-card--compact {
+  padding: 0.625rem 0.75rem;
+  border-radius: 0.5rem;
+}
+
+.los-challenge-card--compact.los-challenge-card--completed {
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+.los-xp-reward {
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--los-gold);
+}
+
+.los-level-progress-panel {
+  background: linear-gradient(135deg, var(--los-bg-card) 0%, rgba(212, 175, 55, 0.06) 100%);
+}
+
+.los-level-up-modal {
+  pointer-events: auto;
+  width: 100%;
+  max-width: 22rem;
+  border-radius: 1rem;
+  border: 1px solid var(--los-border-gold);
+  background: linear-gradient(160deg, var(--los-bg-card) 0%, rgba(26, 34, 61, 0.98) 60%, rgba(154, 123, 40, 0.12) 100%);
+  padding: 2rem;
+  text-align: center;
+  box-shadow: var(--los-shadow-elevated), 0 0 48px -8px rgba(212, 175, 55, 0.35);
+  animation: los-level-up-in 0.3s ease-out;
+}
+
+@keyframes los-level-up-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* ─── Strategic center (Dashboard & Analytics) ─────────────────────────── */
+
+.los-strategic-section-rule {
+  display: block;
+  margin-top: 0.75rem;
+  height: 1px;
+  width: 4rem;
+  background: linear-gradient(90deg, var(--los-gold) 0%, transparent 100%);
+  opacity: 0.7;
+}
+
+.los-score-hero {
+  background: linear-gradient(
+    160deg,
+    var(--los-bg-card) 0%,
+    rgba(212, 175, 55, 0.06) 100%
+  );
+}
+
+.los-kpi-card {
+  background: linear-gradient(180deg, var(--los-bg-card) 0%, rgba(18, 24, 45, 0.92) 100%);
+}
+
+.los-trend-day-card {
+  background: linear-gradient(180deg, var(--los-bg-card) 0%, rgba(18, 24, 45, 0.85) 100%);
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.los-trend-day-card:hover {
+  border-color: var(--los-border-gold);
+  transform: translateY(-1px);
+}
+
+.los-trend-highlight-card {
+  border-left: 3px solid var(--los-gold);
+  background: linear-gradient(90deg, rgba(212, 175, 55, 0.06) 0%, var(--los-bg-card) 40%);
+}
+
+.los-insight-card--positive {
+  border-left: 3px solid var(--los-success);
+}
+
+.los-insight-card--negative {
+  border-left: 3px solid var(--los-danger);
+}
+
+.los-insight-card--neutral {
+  border-left: 3px solid var(--los-warning);
+}
+
+/* ─── AI surfaces (purple accent) ───────────────────────────────────────── */
+
+.los-ai-surface {
+  background: linear-gradient(
+    155deg,
+    var(--los-bg-card) 0%,
+    rgba(139, 92, 246, 0.1) 55%,
+    rgba(139, 92, 246, 0.04) 100%
+  );
+}
+
+.los-ai-surface-glow {
+  position: absolute;
+  right: -3rem;
+  top: -3rem;
+  width: 12rem;
+  height: 12rem;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.22) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.los-ai-surface::before {
+  content: '';
+  position: absolute;
+  inset-x: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--los-ai), var(--los-ai-light), transparent);
+  opacity: 0.85;
+}
+
+.los-ai-badge {
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--los-ai);
+}
+
+.los-ai-recommendation {
+  border-radius: 0.75rem;
+  border: 1px solid var(--los-border-ai);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.14) 0%, rgba(18, 24, 45, 0.9) 100%);
+  padding: 1rem 1.25rem;
+}
+
+.los-ai-item {
+  border-radius: 0.75rem;
+  border: 1px solid var(--los-border-ai);
+  background: rgba(139, 92, 246, 0.08);
+  padding: 1rem;
+}
+
+.los-ai-item-label {
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--los-ai-light);
+}
+
+.los-intelligence-surface {
+  border-color: var(--los-border-gold);
+  background: linear-gradient(
+    160deg,
+    var(--los-bg-card) 0%,
+    rgba(212, 175, 55, 0.05) 50%,
+    rgba(139, 92, 246, 0.04) 100%
+  );
+}
+
+.los-intelligence-surface::before {
+  content: '';
+  position: absolute;
+  inset-x: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--los-gold), var(--los-ai), transparent);
+  opacity: 0.75;
+}
+
+/* Scrollbar — subtle, premium */
+* {
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* ─── Legacy bridge (remove as pages adopt design-system classes) ───────── */
+
+main :is(.text-gray-900, .text-gray-800) {
+  color: var(--los-text-primary);
+}
+
+main :is(.text-gray-700, .text-gray-600) {
+  color: var(--los-text-secondary);
+}
+
+main :is(.text-gray-500, .text-gray-400, .text-gray-300) {
+  color: var(--los-text-muted);
+}
+
+main .bg-white {
+  background-color: var(--los-bg-card);
+}
+
+main .bg-gray-50 {
+  background-color: var(--los-bg-secondary);
+}
+
+main .bg-gray-100 {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+main .border-gray-200,
+main .border-gray-100 {
+  border-color: var(--los-border);
+}
+
+main .ring-gray-900\/5 {
+  --tw-ring-color: rgba(212, 175, 55, 0.08);
+}
+
+main .divide-gray-100 > :not(:last-child) {
+  border-color: var(--los-border-subtle);
 }
