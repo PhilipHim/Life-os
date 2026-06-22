@@ -1,5 +1,6 @@
 import { XP_REWARDS, HIGH_PRIORITIES } from '@/lib/xp/constants'
 import { tryAwardXp } from '@/lib/xp/state'
+import { syncChallenges } from '@/lib/challenges'
 import { getDailyPlanItems } from '@/lib/db/daily-plan'
 import { getHabits } from '@/lib/db/habits'
 import { getEntries as getHabitEntries } from '@/lib/db/habit-entries'
@@ -27,6 +28,7 @@ function isHabitSuccessful(habitId: string, date: string): boolean {
 export function awardLegacyTaskCompleted(taskId: string, title: string, completedAt?: number | null): void {
   const date = completedAt ? dateFromTimestamp(completedAt) : todayStr()
   tryAwardXp(`task:legacy:${taskId}`, XP_REWARDS.taskCompleted, 'task', date, title)
+  afterXpActivity()
 }
 
 export function awardWorkItemCompleted(workItemId: string, title: string, completedAt?: number | null): void {
@@ -35,22 +37,26 @@ export function awardWorkItemCompleted(workItemId: string, title: string, comple
   const source = high ? 'high_priority_task' : 'task'
   const date = completedAt ? dateFromTimestamp(completedAt) : todayStr()
   tryAwardXp(`task:work:${workItemId}`, amount, source, date, title)
+  afterXpActivity()
 }
 
 export function awardHabitIfSuccessful(habitId: string, date: string): void {
   const habit = getHabits().find((h) => h.id === habitId)
   if (!habit || !isHabitSuccessful(habitId, date)) return
   tryAwardXp(`habit:${habitId}:${date}`, XP_REWARDS.habitCompleted, 'habit', date, habit.title)
+  afterXpActivity()
 }
 
 export function awardJournalEntry(date: string): void {
   tryAwardXp(`journal:${date}`, XP_REWARDS.journalEntry, 'journal', date, 'Journal entry')
+  afterXpActivity()
 }
 
 export function awardSleepEntry(entry: SleepEntry): void {
   if (entry.sleepScore >= 80) {
     tryAwardXp(`sleep:${entry.date}`, XP_REWARDS.sleepScore80, 'sleep', entry.date, 'Sleep score 80+')
   }
+  afterXpActivity()
 }
 
 export function awardHealthEntry(entry: HealthEntry): void {
@@ -60,9 +66,14 @@ export function awardHealthEntry(entry: HealthEntry): void {
   if (computeHealthScore(entry).total >= 80) {
     tryAwardXp(`health:score:${entry.date}`, XP_REWARDS.healthScore80, 'health', entry.date, 'Health score 80+')
   }
+  afterXpActivity()
 }
 
 function dateFromTimestamp(ts: number): string {
   const d = new Date(ts)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function afterXpActivity(): void {
+  syncChallenges()
 }

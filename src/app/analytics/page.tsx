@@ -34,12 +34,8 @@ import AIWeeklyReviewCard from '@/components/analytics/AIWeeklyReviewCard'
 import { generateWeeklyReviewAsync, buildWeeklyReviewSnapshot, type WeeklyReview } from '@/lib/weekly-review'
 import { generateMonthlyReviewAsync, buildMonthlyReviewSnapshot, type MonthlyReview } from '@/lib/monthly-review'
 import AIMonthlyReviewCard from '@/components/analytics/AIMonthlyReviewCard'
-import { computeAnalyticsInsights } from '@/lib/analytics-insights'
-import {
-  Trends30DaySection,
-  PersonalInsightsCard,
-  PatternDetectionCard,
-} from '@/components/analytics/AnalyticsInsightsSections'
+import { computeLifeIntelligence } from '@/lib/life-intelligence'
+import LifeIntelligenceSection from '@/components/analytics/LifeIntelligenceSection'
 import { computeXpAnalytics } from '@/lib/xp'
 
 function dateStr(date: Date): string {
@@ -174,7 +170,7 @@ export default function AnalyticsPage() {
   const [monthlyReviewError, setMonthlyReviewError] = useState<string | null>(null)
   const monthLabel = useMemo(() => buildMonthlyReviewSnapshot().monthLabel, [])
 
-  const analyticsInsights = useMemo(() => computeAnalyticsInsights(), [])
+  const lifeIntelligence = useMemo(() => computeLifeIntelligence(), [])
 
   useEffect(() => {
     let cancelled = false
@@ -580,6 +576,8 @@ export default function AnalyticsPage() {
         <p className="text-gray-500">Complete Life OS overview — productivity, health, sleep, character &amp; finance</p>
       </div>
 
+      <LifeIntelligenceSection report={lifeIntelligence} />
+
       {weeklyReviewLoading && !weeklyReview && (
         <Card className="p-8 text-center ring-1 ring-indigo-500/10">
           <p className="text-sm text-gray-500">Generating your AI Weekly Review…</p>
@@ -678,10 +676,6 @@ export default function AnalyticsPage() {
           </div>
         </AnalyticsSection>
       )}
-
-      <Trends30DaySection trends={analyticsInsights.trends30Day} />
-      <PersonalInsightsCard insights={analyticsInsights.personalInsights} />
-      <PatternDetectionCard patterns={analyticsInsights.patterns} />
 
       <section>
         <div className="mb-4">

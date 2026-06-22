@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Card from '@/components/ui/Card'
 import { StatCard } from '@/components/analytics/AnalyticsSection'
 import { buildProfileData, type ProfileData, type Achievement } from '@/lib/profile'
+import ChallengeCard from '@/components/challenges/ChallengeCard'
 import type { UserTitle } from '@/lib/titles/definitions'
 import { ACHIEVEMENT_CATEGORY_LABELS } from '@/lib/achievements'
 import { getProfileSettings, saveProfileSettings, saveActiveTitle } from '@/lib/db/profile'
@@ -278,9 +279,11 @@ export default function ProfilePage() {
     const onXpUpdated = () => refresh()
     const onFocus = () => refresh()
     window.addEventListener('xp-updated', onXpUpdated)
+    window.addEventListener('challenges-updated', onXpUpdated)
     window.addEventListener('focus', onFocus)
     return () => {
       window.removeEventListener('xp-updated', onXpUpdated)
+      window.removeEventListener('challenges-updated', onXpUpdated)
       window.removeEventListener('focus', onFocus)
     }
   }, [refresh])
@@ -307,7 +310,7 @@ export default function ProfilePage() {
     )
   }
 
-  const { stats, progress, achievements, titles, xpHistory } = profile
+  const { stats, progress, achievements, titles, challenges, xpHistory } = profile
   const unlockedTitles = titles.titles.filter((t) => t.unlocked)
   const lockedTitles = titles.titles.filter((t) => !t.unlocked)
   const unlockedAchievements = achievements.filter((a) => a.unlocked)
@@ -334,6 +337,69 @@ export default function ProfilePage() {
           <StatCard label="Today" value={`+${xpHistory.daily} XP`} sublabel="Daily XP" />
           <StatCard label="This Week" value={`+${xpHistory.weekly} XP`} sublabel="Mon – Sun" />
           <StatCard label="This Month" value={`+${xpHistory.monthly} XP`} sublabel="Calendar month" />
+        </div>
+      </section>
+
+      <section>
+        <SectionHeading
+          title="Challenges"
+          subtitle={`Daily ${challenges.dailyCompleted}/${challenges.daily.length} · Weekly ${challenges.weeklyCompleted}/${challenges.weekly.length} · Short-term goals with bonus XP`}
+        />
+
+        <div className="grid gap-3 sm:grid-cols-3 mb-8">
+          <StatCard
+            label="Daily Progress"
+            value={`${challenges.dailyCompleted} / ${challenges.daily.length}`}
+            sublabel={`+${challenges.dailyXpEarned} of ${challenges.dailyXpAvailable} XP earned`}
+          />
+          <StatCard
+            label="Weekly Progress"
+            value={`${challenges.weeklyCompleted} / ${challenges.weekly.length}`}
+            sublabel={`+${challenges.weeklyXpEarned} of ${challenges.weeklyXpAvailable} XP earned`}
+          />
+          <StatCard
+            label="Today's Rewards"
+            value={`+${challenges.dailyXpEarned} XP`}
+            sublabel={
+              challenges.dailyCompleted === challenges.daily.length && challenges.daily.length > 0
+                ? 'All daily challenges complete'
+                : `${challenges.daily.length - challenges.dailyCompleted} remaining today`
+            }
+          />
+        </div>
+
+        <div className="mb-8">
+          <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">
+            Daily Challenges
+          </h3>
+          {challenges.daily.length > 0 ? (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {challenges.daily.map((challenge) => (
+                <ChallengeCard key={challenge.id} challenge={challenge} />
+              ))}
+            </div>
+          ) : (
+            <Card>
+              <p className="text-center text-sm text-gray-400 py-6">Daily challenges refresh each morning.</p>
+            </Card>
+          )}
+        </div>
+
+        <div>
+          <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">
+            Weekly Challenges
+          </h3>
+          {challenges.weekly.length > 0 ? (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {challenges.weekly.map((challenge) => (
+                <ChallengeCard key={challenge.id} challenge={challenge} />
+              ))}
+            </div>
+          ) : (
+            <Card>
+              <p className="text-center text-sm text-gray-400 py-6">Weekly challenges refresh each Monday.</p>
+            </Card>
+          )}
         </div>
       </section>
 

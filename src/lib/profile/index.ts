@@ -3,6 +3,7 @@ import { computeProgress } from '@/lib/profile/progression'
 import { computeAchievements } from '@/lib/achievements'
 import { computeTitles } from '@/lib/titles'
 import { getTotalXp, getXpHistory } from '@/lib/xp'
+import { getChallengeState } from '@/lib/challenges'
 import { getProfileSettings } from '@/lib/db/profile'
 import type { ProfileData } from '@/lib/profile/types'
 
@@ -14,12 +15,14 @@ export function buildProfileData(): ProfileData {
   const titles = computeTitles(stats, computeProgress(totalXp), achievements, settings.activeTitleId)
   const progress = computeProgress(totalXp, titles.activeTitle.name)
   const xpHistory = getXpHistory()
+  const challenges = getChallengeState()
 
   return {
     stats,
     progress,
     achievements,
     titles,
+    challenges,
     xpHistory: {
       daily: xpHistory.daily,
       weekly: xpHistory.weekly,

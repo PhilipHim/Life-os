@@ -39,12 +39,14 @@ export interface Achievement {
 }
 
 import type { TitleState } from '@/lib/titles/definitions'
+import type { ChallengeState } from '@/lib/challenges/types'
 
 export interface ProfileData {
   stats: ProfileStats
   progress: ProfileProgress
   achievements: Achievement[]
   titles: TitleState
+  challenges: ChallengeState
   xpHistory: {
     daily: number
     weekly: number

@@ -1,19 +1,17 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
 import type { DailyPlanItem } from '@/lib/types'
-import {
-  getDailyPlanItems,
-  addDailyPlanItem as persistAdd,
-  removeDailyPlanItem as persistRemove,
-  updateDailyPlanItem as persistUpdate,
-  saveAllDailyPlanItems as persistSaveAll,
-} from '@/lib/db/daily-plan'
+import { getDailyPlanItems, saveAllDailyPlanItems as persistSaveAll } from '@/lib/db/daily-plan'
+import { getPlannerDefaults } from '@/lib/planner-defaults'
+import { autoSortPlanItems, orderPlanItems, reindexPlanItems } from '@/lib/planner'
 
 function today(): string {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
+
+export type AutoPlanResult = 'success' | 'no_eligible'
 
 interface DailyPlanContextType {
   planItems: DailyPlanItem[]
@@ -21,7 +19,8 @@ interface DailyPlanContextType {
   addToPlan: (workItemId: string, priority: 'H1' | 'H2' | 'M' | 'L', estimatedDuration: number) => void
   removeFromPlan: (id: string) => void
   updatePlanItem: (updated: DailyPlanItem) => void
-  movePlanItem: (id: string, direction: 'up' | 'down') => void
+  reorderPlanItems: (orderedIds: string[]) => void
+  autoPlanToday: (workItemIds: string[]) => AutoPlanResult
 }
 
 const DailyPlanContext = createContext<DailyPlanContextType | null>(null)
@@ -35,67 +34,85 @@ export function DailyPlanProvider({ children }: { children: ReactNode }) {
 
   const addToPlan = (workItemId: string, priority: 'H1' | 'H2' | 'M' | 'L', estimatedDuration: number) => {
     const all = getDailyPlanItems()
-    const todayItems = all.filter((i) => i.date === today()).sort((a, b) => a.orderIndex - b.orderIndex)
-    const priorityOrder: Record<string, number> = { H1: 0, H2: 1, M: 2, L: 3 }
-    const newP = priorityOrder[priority]
-    let insertIdx = todayItems.length
-    for (let i = 0; i < todayItems.length; i++) {
-      if (priorityOrder[todayItems[i].priority] > newP) {
-        insertIdx = i
-        break
-      }
-    }
+    const todayStr = today()
+    const todayItems = orderPlanItems(all.filter((i) => i.date === todayStr))
     const item: DailyPlanItem = {
       id: crypto.randomUUID(),
       workItemId,
       priority,
       estimatedDuration,
-      date: today(),
+      date: todayStr,
       createdAt: Date.now(),
-      orderIndex: insertIdx,
+      orderIndex: todayItems.length,
     }
-    const updated = all.map((i) => {
-      if (i.date !== today()) return i
-      return i.orderIndex >= insertIdx
-        ? { ...i, orderIndex: i.orderIndex + 1 }
-        : i
-    })
-    updated.push(item)
-    setPlanItems(persistSaveAll(updated))
+    const normalized = reindexPlanItems([...todayItems, item])
+    const otherDays = all.filter((i) => i.date !== todayStr)
+    setPlanItems(persistSaveAll([...otherDays, ...normalized]))
   }
 
   const removeFromPlan = (id: string) => {
-    setPlanItems(persistRemove(id))
+    const all = getDailyPlanItems()
+    const todayStr = today()
+    const remaining = all.filter((i) => i.id !== id)
+    const todayItems = reindexPlanItems(remaining.filter((i) => i.date === todayStr))
+    const otherDays = remaining.filter((i) => i.date !== todayStr)
+    setPlanItems(persistSaveAll([...otherDays, ...todayItems]))
   }
 
   const updatePlanItem = (updated: DailyPlanItem) => {
-    setPlanItems(persistUpdate(updated))
-  }
-
-  const movePlanItem = (id: string, direction: 'up' | 'down') => {
     const all = getDailyPlanItems()
-    const todayItems = all.filter((i) => i.date === today()).sort((a, b) => a.orderIndex - b.orderIndex)
-    const idx = todayItems.findIndex((i) => i.id === id)
-    if (idx === -1) return
-    if (direction === 'up' && idx === 0) return
-    if (direction === 'down' && idx === todayItems.length - 1) return
-
-    const swapIdx = direction === 'up' ? idx - 1 : idx + 1
-    const a = { ...todayItems[idx] }
-    const b = { ...todayItems[swapIdx] }
-    const tmp = a.orderIndex
-    a.orderIndex = b.orderIndex
-    b.orderIndex = tmp
-
-    const updated = all.map((i) => {
-      if (i.id === a.id) return a
-      if (i.id === b.id) return b
-      return i
-    })
-    setPlanItems(persistSaveAll(updated))
+    const todayStr = today()
+    const todayItems = orderPlanItems(all.filter((i) => i.date === todayStr))
+    const otherDays = all.filter((i) => i.date !== todayStr)
+    const mergedToday = todayItems.map((i) =>
+      i.id === updated.id ? { ...updated, startTime: undefined } : i
+    )
+    setPlanItems(persistSaveAll([...otherDays, ...mergedToday]))
   }
 
-  const todayPlan = planItems.filter((i) => i.date === today())
+  const reorderPlanItems = (orderedIds: string[]) => {
+    const all = getDailyPlanItems()
+    const todayStr = today()
+    const todayItems = orderPlanItems(all.filter((i) => i.date === todayStr))
+    const byId = new Map(todayItems.map((i) => [i.id, i]))
+    const reordered = orderedIds.map((id) => byId.get(id)).filter(Boolean) as DailyPlanItem[]
+    const missing = todayItems.filter((i) => !orderedIds.includes(i.id))
+    const normalized = reindexPlanItems([...reordered, ...missing])
+    const otherDays = all.filter((i) => i.date !== todayStr)
+    setPlanItems(persistSaveAll([...otherDays, ...normalized]))
+  }
+
+  const autoPlanToday = (workItemIds: string[]): AutoPlanResult => {
+    if (workItemIds.length === 0) return 'no_eligible'
+
+    const all = getDailyPlanItems()
+    const todayStr = today()
+    const existingToday = orderPlanItems(all.filter((i) => i.date === todayStr))
+    const existingByWorkId = new Map(existingToday.map((i) => [i.workItemId, i]))
+
+    const items: DailyPlanItem[] = workItemIds.map((workItemId) => {
+      const existing = existingByWorkId.get(workItemId)
+      if (existing) return existing
+
+      const defaults = getPlannerDefaults(workItemId)
+      return {
+        id: crypto.randomUUID(),
+        workItemId,
+        priority: defaults.priority,
+        estimatedDuration: defaults.estimatedDuration,
+        date: todayStr,
+        createdAt: Date.now(),
+        orderIndex: 0,
+      }
+    })
+
+    const sorted = autoSortPlanItems(items)
+    const otherDays = all.filter((i) => i.date !== todayStr)
+    setPlanItems(persistSaveAll([...otherDays, ...sorted]))
+    return 'success'
+  }
+
+  const todayPlan = orderPlanItems(planItems.filter((i) => i.date === today()))
 
   return (
     <DailyPlanContext.Provider
@@ -105,7 +122,8 @@ export function DailyPlanProvider({ children }: { children: ReactNode }) {
         addToPlan,
         removeFromPlan,
         updatePlanItem,
-        movePlanItem,
+        reorderPlanItems,
+        autoPlanToday,
       }}
     >
       {children}

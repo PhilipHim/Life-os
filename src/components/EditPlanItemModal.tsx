@@ -20,7 +20,6 @@ interface Props {
 export default function EditPlanItemModal({ item, onSave, onClose }: Props) {
   const [priority, setPriority] = useState<'H1' | 'H2' | 'M' | 'L'>(item.priority)
   const [duration, setDuration] = useState(String(item.estimatedDuration))
-  const [startTime, setStartTime] = useState(item.startTime ?? '')
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -28,7 +27,7 @@ export default function EditPlanItemModal({ item, onSave, onClose }: Props) {
       ...item,
       priority,
       estimatedDuration: Math.max(1, parseInt(duration, 10) || 30),
-      startTime: startTime.trim() || undefined,
+      startTime: undefined,
     })
     onClose()
   }
@@ -36,7 +35,7 @@ export default function EditPlanItemModal({ item, onSave, onClose }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-2xl">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Edit Daily Plan Item</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Edit Work Block</h2>
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
@@ -62,10 +61,10 @@ export default function EditPlanItemModal({ item, onSave, onClose }: Props) {
 
           <div>
             <p className="text-xs font-medium uppercase tracking-widest text-gray-400 mb-2">
-              Estimated Time (minutes)
+              Block Duration (minutes)
             </p>
             <div className="flex gap-2">
-              {[15, 30, 60].map((n) => (
+              {[15, 30, 60, 90].map((n) => (
                 <button
                   key={n}
                   type="button"
@@ -76,7 +75,7 @@ export default function EditPlanItemModal({ item, onSave, onClose }: Props) {
                       : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
                   }`}
                 >
-                  {n < 60 ? `${n}min` : '1h'}
+                  {n < 60 ? `${n}m` : `${n / 60}h`}
                 </button>
               ))}
               <input
@@ -88,16 +87,6 @@ export default function EditPlanItemModal({ item, onSave, onClose }: Props) {
                 className="min-h-[36px] w-20 rounded-lg border border-gray-300 bg-white px-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-1"
               />
             </div>
-          </div>
-
-          <div>
-            <p className="text-xs font-medium uppercase tracking-widest text-gray-400 mb-2">Start Time (optional)</p>
-            <input
-              type="time"
-              value={startTime}
-              onChange={(e) => setStartTime(e.target.value)}
-              className="min-h-[44px] w-full rounded-lg border border-gray-300 bg-white px-4 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-1"
-            />
           </div>
 
           <div className="flex gap-2 pt-1">

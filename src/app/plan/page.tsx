@@ -1,25 +1,27 @@
 'use client'
 
 import { useState, useMemo, useCallback } from 'react'
-import type { DailyPlanItem } from '@/lib/types'
+import type { DailyPlanItem, WorkItem } from '@/lib/types'
 import { useDailyPlan } from '@/lib/DailyPlanContext'
 import { useFocus } from '@/lib/FocusContext'
 import { useWorkItems } from '@/lib/WorkItemContext'
 import {
-  generateTodayInstances,
-  toggleRecurringCompletion,
-  skipRecurringToday,
-  unskipRecurringToday,
-  computeRecurringTemplateStats,
-  isRecurringWorkItemCompleted,
-  type RecurringInstance,
-} from '@/lib/recurring'
+  buildExecutionQueue,
+  summarizeExecution,
+  formatMinutes,
+  type ExecutionBlock,
+} from '@/lib/planner'
+import {
+  getPlannerBreakState,
+  addManualBreak,
+  removeBreak,
+  resetPlannerBreaks,
+} from '@/lib/db/planner-breaks'
+import { getPlannerDefaults, setPlannerDefaults } from '@/lib/planner-defaults'
 import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Checkbox from '@/components/ui/Checkbox'
 import EditPlanItemModal from '@/components/EditPlanItemModal'
-
-const priorityOrder: Record<string, number> = { H1: 0, H2: 1, M: 2, L: 3 }
 
 const priorityColor: Record<string, string> = {
   H1: 'bg-red-500',
@@ -28,11 +30,7 @@ const priorityColor: Record<string, string> = {
   L: 'bg-gray-400',
 }
 
-function formatTime(minutesFromMidnight: number): string {
-  const h = Math.floor(minutesFromMidnight / 60)
-  const m = minutesFromMidnight % 60
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
-}
+const priorities = ['H1', 'H2', 'M', 'L'] as const
 
 function today(): string {
   const d = new Date()
@@ -51,363 +49,425 @@ function formatFocusTime(ms: number): string {
   return `${m}m ${s}s`
 }
 
-const DAY_START = 9 * 60
-const BREAK_DURATION = 15
+function isTaskBlock(block: ExecutionBlock): block is Extract<ExecutionBlock, { kind: 'task' }> {
+  return block.kind === 'task'
+}
 
 export default function PlanPage() {
-  const { todayPlan, removeFromPlan, updatePlanItem, movePlanItem } = useDailyPlan()
+  const { todayPlan, addToPlan, removeFromPlan, updatePlanItem, reorderPlanItems, autoPlanToday } =
+    useDailyPlan()
   const { activeWorkItemId, startFocus, stopFocus, focusSessions } = useFocus()
-  const { workItems, recurringTemplates } = useWorkItems()
-  const [editItem, setEditItem] = useState<DailyPlanItem | null>(null)
-  const [recurringRefreshKey, setRecurringRefreshKey] = useState(0)
+  const { workItems, toggleWorkItem } = useWorkItems()
 
-  const plannedTemplateIds = useMemo(
-    () => new Set(
-      todayPlan
-        .map((pi) => workItems.find((w) => w.id === pi.workItemId))
-        .filter((wi) => wi?.recurring && wi.isTemplate)
-        .map((wi) => wi!.id)
-    ),
-    [todayPlan, workItems]
+  const todayStr = today()
+  const [editItem, setEditItem] = useState<DailyPlanItem | null>(null)
+  const [breakState, setBreakState] = useState(() => getPlannerBreakState(todayStr))
+  const [dragTaskId, setDragTaskId] = useState<string | null>(null)
+  const [defaultsVersion, setDefaultsVersion] = useState(0)
+  const [autoPlanFeedback, setAutoPlanFeedback] = useState<string | null>(null)
+
+  const plannedWorkItemIds = useMemo(
+    () => new Set(todayPlan.map((p) => p.workItemId)),
+    [todayPlan]
   )
 
-  const todayRecurring = useMemo(() => {
-    return generateTodayInstances(recurringTemplates).filter(
-      (i) => !plannedTemplateIds.has(i.templateId)
+  const availableTasks = useMemo(() => {
+    return workItems.filter(
+      (i) =>
+        i.type === 'single' &&
+        i.status === 'active' &&
+        !i.isTemplate &&
+        !i.parentId &&
+        !plannedWorkItemIds.has(i.id)
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recurringTemplates, plannedTemplateIds, recurringRefreshKey])
+  }, [workItems, plannedWorkItemIds, defaultsVersion])
 
-  const refreshRecurring = useCallback(() => {
-    setRecurringRefreshKey((k) => k + 1)
-  }, [])
+  const planableTasks = useMemo(() => {
+    return workItems.filter(
+      (i) => i.type === 'single' && i.status === 'active' && !i.isTemplate && !i.parentId
+    )
+  }, [workItems])
 
-  const handleCompleteRecurring = useCallback((templateId: string) => {
-    toggleRecurringCompletion(templateId)
-    refreshRecurring()
-  }, [refreshRecurring])
+  const canAutoPlan = planableTasks.length > 0
 
-  const handleSkipRecurring = useCallback((templateId: string) => {
-    skipRecurringToday(templateId)
-    refreshRecurring()
-  }, [refreshRecurring])
+  const getTitle = useCallback(
+    (workItemId: string) => workItems.find((w) => w.id === workItemId)?.title ?? 'Unknown task',
+    [workItems]
+  )
 
-  const handleUnskipRecurring = useCallback((templateId: string) => {
-    unskipRecurringToday(templateId)
-    refreshRecurring()
-  }, [refreshRecurring])
+  const executionQueue = useMemo(
+    () =>
+      buildExecutionQueue(todayPlan, getTitle, {
+        hiddenAutoBreaks: breakState.hiddenAutoBreaks,
+        manualBreaks: breakState.manualBreaks,
+      }),
+    [todayPlan, getTitle, breakState]
+  )
 
-  const sorted = useMemo(() => {
-    return [...todayPlan].sort((a, b) => {
-      if (a.orderIndex !== b.orderIndex) return a.orderIndex - b.orderIndex
-      return priorityOrder[a.priority] - priorityOrder[b.priority]
-    })
-  }, [todayPlan])
+  const summary = useMemo(
+    () => summarizeExecution(todayPlan, executionQueue),
+    [todayPlan, executionQueue]
+  )
 
-  const recurringCompleted = todayRecurring.filter((i) => i.instanceStatus === 'completed').length
-  const recurringCountable = todayRecurring.filter((i) => i.instanceStatus !== 'skipped').length
-  const planCompleted = sorted.filter((pi) =>
-    isRecurringWorkItemCompleted(pi.workItemId, workItems)
-  ).length
+  const planCompleted = todayPlan.filter((pi) => {
+    const wi = workItems.find((w) => w.id === pi.workItemId)
+    return wi?.status === 'completed'
+  }).length
 
-  const totalItems = sorted.length + recurringCountable
-  const totalCompleted = planCompleted + recurringCompleted
-  const completionPct = totalItems > 0 ? Math.round((totalCompleted / totalItems) * 100) : 0
+  const completionPct =
+    summary.totalTasks > 0 ? Math.round((planCompleted / summary.totalTasks) * 100) : 0
 
-  const timeline = useMemo(() => {
-    const blocks: { type: 'task' | 'break'; start: number; end: number; label: string; planItem?: typeof sorted[0] }[] = []
-    let cursor = DAY_START
+  const handleAddToPlan = (task: WorkItem) => {
+    const defaults = getPlannerDefaults(task.id)
+    addToPlan(task.id, defaults.priority, defaults.estimatedDuration)
+  }
 
-    for (const item of sorted) {
-      const wi = workItems.find((w) => w.id === item.workItemId)
-      const title = wi?.title ?? 'Unknown task'
+  const handleDefaultsChange = (
+    workItemId: string,
+    patch: Partial<{ priority: 'H1' | 'H2' | 'M' | 'L'; estimatedDuration: number }>
+  ) => {
+    const current = getPlannerDefaults(workItemId)
+    setPlannerDefaults(workItemId, { ...current, ...patch })
+    setDefaultsVersion((v) => v + 1)
+  }
 
-      blocks.push({
-        type: 'task',
-        start: cursor,
-        end: cursor + item.estimatedDuration,
-        label: title,
-        planItem: item,
-      })
-      cursor += item.estimatedDuration
+  const handleTaskDragStart = (planItemId: string) => {
+    setDragTaskId(planItemId)
+  }
 
-      if (cursor < 24 * 60) {
-        blocks.push({
-          type: 'break',
-          start: cursor,
-          end: cursor + BREAK_DURATION,
-          label: 'Break',
-        })
-        cursor += BREAK_DURATION
-      }
-    }
-
-    return blocks
-  }, [sorted, workItems])
-
-  const handleSave = (updated: DailyPlanItem) => {
-    updatePlanItem(updated)
+  const handleTaskDrop = (targetPlanItemId: string) => {
+    if (!dragTaskId || dragTaskId === targetPlanItemId) return
+    const ids = todayPlan.map((t) => t.id)
+    const fromIdx = ids.indexOf(dragTaskId)
+    const toIdx = ids.indexOf(targetPlanItemId)
+    if (fromIdx === -1 || toIdx === -1) return
+    const next = [...ids]
+    const [moved] = next.splice(fromIdx, 1)
+    next.splice(toIdx, 0, moved)
+    reorderPlanItems(next)
+    setDragTaskId(null)
   }
 
   const handleFocus = (pi: DailyPlanItem) => {
     if (activeWorkItemId === pi.workItemId) {
       stopFocus()
     } else {
-      const wi = workItems.find((w) => w.id === pi.workItemId)
-      startFocus(pi.workItemId, wi?.title ?? 'Unknown task')
+      startFocus(pi.workItemId, getTitle(pi.workItemId))
     }
   }
 
-  const handleFocusRecurring = (item: RecurringInstance) => {
-    if (activeWorkItemId === item.templateId) {
-      stopFocus()
-    } else {
-      startFocus(item.templateId, item.title)
+  const handleSave = (updated: DailyPlanItem) => {
+    updatePlanItem(updated)
+    setEditItem(null)
+  }
+
+  const handleAddBreakAfter = (afterPlanItemId: string | null) => {
+    setBreakState(addManualBreak(todayStr, afterPlanItemId))
+  }
+
+  const handleRemoveBreak = (breakId: string, auto: boolean) => {
+    setBreakState(removeBreak(todayStr, breakId, auto))
+  }
+
+  const handleAutoPlan = () => {
+    setAutoPlanFeedback(null)
+    const result = autoPlanToday(planableTasks.map((t) => t.id))
+    if (result === 'no_eligible') {
+      setAutoPlanFeedback('No eligible tasks found.')
+      return
     }
+    setBreakState(resetPlannerBreaks(todayStr))
   }
 
   return (
     <div className="space-y-10">
-      <div>
-        <h1 className="text-4xl font-bold tracking-tight">Today Plan</h1>
-        <p className="text-sm text-gray-500 mt-1">{formatDate(today())}</p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-4xl font-bold tracking-tight">Execution Plan</h1>
+          <p className="text-sm text-gray-500 mt-1">{formatDate(todayStr)}</p>
+          <p className="text-sm text-gray-400 mt-0.5">
+            Build today&apos;s queue — prioritize, reorder, and execute.
+          </p>
+        </div>
+        <div className="flex flex-col items-stretch sm:items-end gap-1.5 shrink-0">
+          <Button variant="secondary" disabled={!canAutoPlan} onClick={handleAutoPlan}>
+            Auto Plan
+          </Button>
+          {!canAutoPlan ? (
+            <p className="text-xs text-gray-400 sm:text-right">No tasks available for planning.</p>
+          ) : (
+            <p className="text-xs text-gray-400 sm:text-right">
+              Pulls {planableTasks.length} task{planableTasks.length !== 1 ? 's' : ''} from Work, sorts by priority, and builds today&apos;s queue.
+            </p>
+          )}
+          {autoPlanFeedback && (
+            <p className="text-xs text-amber-700 sm:text-right">{autoPlanFeedback}</p>
+          )}
+        </div>
       </div>
 
-      {totalItems > 0 && (
-        <Card className="p-4">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400">Today&apos;s Completion</p>
-              <p className="mt-1 text-2xl font-bold text-gray-900 tabular-nums">
-                {totalCompleted}<span className="text-base font-normal text-gray-400"> / {totalItems}</span>
-                <span className="ml-2 text-lg text-gray-500">({completionPct}%)</span>
-              </p>
-            </div>
-            <div className="flex-1 max-w-xs h-2 rounded-full bg-gray-100 overflow-hidden">
+      {summary.totalTasks > 0 && (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Card className="p-4">
+            <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400">Planned Tasks</p>
+            <p className="mt-1 text-2xl font-bold text-gray-900 tabular-nums">{summary.totalTasks}</p>
+          </Card>
+          <Card className="p-4">
+            <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400">Work Time</p>
+            <p className="mt-1 text-2xl font-bold text-gray-900 tabular-nums">
+              {formatMinutes(summary.totalWorkMinutes)}
+            </p>
+          </Card>
+          <Card className="p-4">
+            <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400">Breaks</p>
+            <p className="mt-1 text-2xl font-bold text-gray-900 tabular-nums">
+              {summary.breakCount}
+              <span className="text-sm font-normal text-gray-400 ml-1">
+                ({formatMinutes(summary.totalBreakMinutes)})
+              </span>
+            </p>
+          </Card>
+          <Card className="p-4">
+            <p className="text-[10px] font-medium uppercase tracking-widest text-gray-400">Completion</p>
+            <p className="mt-1 text-2xl font-bold text-gray-900 tabular-nums">
+              {planCompleted}/{summary.totalTasks}
+              <span className="text-sm font-normal text-gray-400 ml-1">({completionPct}%)</span>
+            </p>
+            <div className="mt-2 h-1.5 rounded-full bg-gray-100 overflow-hidden">
               <div
                 className="h-full rounded-full bg-gray-900 transition-all duration-500"
                 style={{ width: `${completionPct}%` }}
               />
             </div>
-          </div>
-        </Card>
+          </Card>
+        </div>
       )}
 
-      {todayRecurring.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="text-sm font-semibold uppercase tracking-widest text-gray-400">Recurring Tasks</h2>
-          {todayRecurring.map((item) => {
-            const stats = computeRecurringTemplateStats(
-              recurringTemplates.find((t) => t.id === item.templateId)!
-            )
-            const isSkipped = item.instanceStatus === 'skipped'
-            const isDone = item.instanceStatus === 'completed'
-            const isActiveFocus = activeWorkItemId === item.templateId
-
-            return (
-              <Card
-                key={item.id}
-                className={`transition-all hover:border-gray-300 hover:shadow-md ${isSkipped ? 'opacity-60' : ''} ${isActiveFocus ? 'ring-2 ring-gray-900 bg-gray-50' : ''}`}
-              >
-                <div className="flex items-center gap-4">
-                  <Checkbox
-                    checked={isDone}
-                    disabled={isSkipped}
-                    onChange={() => handleCompleteRecurring(item.templateId)}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="shrink-0 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-600">
-                        {item.recurrenceType === 'weekly' ? 'Weekly' : 'Daily'}
-                      </span>
-                      {isSkipped && (
-                        <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
-                          Skipped
-                        </span>
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold uppercase tracking-widest text-gray-400">Available Tasks</h2>
+        {availableTasks.length === 0 ? (
+          <Card className="p-6">
+            <p className="text-center text-sm text-gray-400">
+              {planableTasks.length === 0
+                ? 'No tasks available for planning.'
+                : 'All active tasks are already in today\'s plan.'}
+            </p>
+          </Card>
+        ) : (
+          <div className="space-y-2">
+            {availableTasks.map((task) => {
+              const defaults = getPlannerDefaults(task.id)
+              return (
+                <Card key={task.id} className="p-4 transition-all hover:border-gray-300">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-gray-900">{task.title}</p>
+                      {task.description && (
+                        <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{task.description}</p>
                       )}
-                      {isActiveFocus && (
-                        <span className="inline-flex items-center gap-1 rounded bg-gray-900 px-2 py-0.5 text-[10px] font-medium text-white animate-pulse">
-                          ● FOCUS
-                        </span>
-                      )}
-                      <p className={`text-sm ${isDone ? 'text-gray-400 line-through' : isSkipped ? 'text-gray-400' : 'text-gray-900'}`}>
-                        {item.title}
-                      </p>
                     </div>
-                    {item.description && (
-                      <p className="text-xs text-gray-400 mt-0.5">{item.description}</p>
-                    )}
-                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
-                      <span>{stats.streak} day streak</span>
-                      <span>·</span>
-                      <span>{stats.weeklyCompletionPct}% this week ({stats.weeklyCompleted}/{stats.weeklyDue})</span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex gap-1">
+                        {priorities.map((p) => (
+                          <button
+                            key={p}
+                            type="button"
+                            onClick={() => handleDefaultsChange(task.id, { priority: p })}
+                            className={`rounded px-2 py-1 text-[10px] font-bold transition-all ${
+                              defaults.priority === p
+                                ? `${priorityColor[p]} text-white`
+                                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                            }`}
+                          >
+                            {p}
+                          </button>
+                        ))}
+                      </div>
+                      <input
+                        type="number"
+                        min={1}
+                        value={defaults.estimatedDuration}
+                        onChange={(e) =>
+                          handleDefaultsChange(task.id, {
+                            estimatedDuration: Math.max(1, parseInt(e.target.value, 10) || 30),
+                          })
+                        }
+                        className="w-16 rounded-lg border border-gray-300 bg-white px-2 py-1 text-xs tabular-nums shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                        aria-label="Estimated minutes"
+                      />
+                      <span className="text-xs text-gray-400">min</span>
+                      <Button size="sm" onClick={() => handleAddToPlan(task)}>
+                        Add To Plan
+                      </Button>
                     </div>
                   </div>
-                  <div className="flex flex-col gap-1 shrink-0">
-                    {!isSkipped && (
-                      <Button
-                        variant={isActiveFocus ? 'secondary' : 'primary'}
-                        size="sm"
-                        onClick={() => handleFocusRecurring(item)}
-                      >
-                        {isActiveFocus ? 'Stop' : 'Focus'}
-                      </Button>
-                    )}
-                    {isSkipped ? (
-                      <Button variant="ghost" size="sm" onClick={() => handleUnskipRecurring(item.templateId)}>
-                        Undo Skip
-                      </Button>
-                    ) : (
+                </Card>
+              )
+            })}
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold uppercase tracking-widest text-gray-400">Today&apos;s Plan</h2>
+          {todayPlan.length > 0 && (
+            <Button variant="ghost" size="sm" onClick={() => handleAddBreakAfter(null)}>
+              + Add Break
+            </Button>
+          )}
+        </div>
+
+        {todayPlan.length === 0 ? (
+          <Card className="p-6">
+            <p className="text-center text-sm text-gray-400">
+              Your execution queue is empty. Add tasks from Available Tasks above.
+            </p>
+          </Card>
+        ) : (
+          <div className="space-y-2">
+            {executionQueue.map((block) => {
+              if (block.kind === 'break') {
+                return (
+                  <Card
+                    key={block.id}
+                    className="border-dashed border-gray-200 bg-gray-50/80 py-3 px-4"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="text-lg text-gray-300">☕</span>
+                        <div>
+                          <p className="text-sm font-medium text-gray-600">Break</p>
+                          <p className="text-xs text-gray-400">
+                            {block.durationMinutes} minutes
+                            {block.auto && (
+                              <span className="ml-2 rounded bg-gray-200 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-gray-500">
+                                Auto
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                      </div>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleSkipRecurring(item.templateId)}
-                        className="text-gray-500 hover:text-gray-700"
+                        onClick={() => handleRemoveBreak(block.id, block.auto)}
+                        className="text-gray-400 hover:text-red-500 shrink-0"
                       >
-                        Skip
+                        Remove
                       </Button>
-                    )}
-                  </div>
-                </div>
-              </Card>
-            )
-          })}
-        </div>
-      )}
-
-      {sorted.length === 0 && todayRecurring.length === 0 && (
-        <Card>
-          <p className="text-center text-sm text-gray-400 py-6">
-            No tasks planned for today. Add tasks from the Work page or create recurring tasks.
-          </p>
-        </Card>
-      )}
-
-      {sorted.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="text-sm font-semibold uppercase tracking-widest text-gray-400">Planned Items</h2>
-          <div className="relative">
-            <div className="absolute left-[72px] top-0 bottom-0 w-px bg-gray-200" />
-
-            <div className="space-y-0">
-              {timeline.map((block, idx) => {
-                if (block.type === 'break') {
-                  return (
-                    <div key={`break-${idx}`} className="flex items-center gap-4 py-2">
-                      <div className="w-[72px] text-right">
-                        <span className="text-xs text-gray-400">{formatTime(block.start)}</span>
-                      </div>
-                      <div className="flex-1 border-t border-dashed border-gray-200" />
-                      <span className="text-xs text-gray-400 pr-2">{Math.round((block.end - block.start) / 60 * 10) / 10}h break</span>
                     </div>
-                  )
-                }
-
-                const pi = block.planItem!
-                const wi = workItems.find((w) => w.id === pi.workItemId)
-                const done = wi?.status === 'completed'
-                const sortedIdx = sorted.findIndex((s) => s.id === pi.id)
-                const isFirst = sortedIdx === 0
-                const isLast = sortedIdx === sorted.length - 1
-                const isActive = activeWorkItemId === pi.workItemId
-                const focusMs = focusSessions
-                  .filter((s) => s.workItemId === pi.workItemId && s.duration > 0)
-                  .reduce((sum, s) => sum + s.duration, 0)
-
-                return (
-                  <div key={pi.id} className={`relative flex gap-4 py-1.5 ${isActive ? 'opacity-100' : ''}`}>
-                    <div className="w-[72px] pt-1 text-right">
-                      <span className="text-xs font-medium text-gray-400">{formatTime(block.start)}</span>
-                      <span className="block text-xs text-gray-300">{formatTime(block.end)}</span>
-                    </div>
-
-                    <div className="relative flex-1">
-                      <div className="absolute -left-[19px] top-3 size-3 rounded-full border-2 border-white bg-gray-900 shadow-sm" />
-
-                      <Card className={`transition-all hover:border-gray-300 hover:shadow-md ${isActive ? 'ring-2 ring-gray-900 bg-gray-50' : ''}`}>
-                        <div className="flex gap-3">
-                          <div
-                            className={`shrink-0 w-1 self-stretch rounded-full ${priorityColor[pi.priority]}`}
-                          />
-
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span
-                                className={`rounded px-1.5 py-0.5 text-[10px] font-bold text-white ${priorityColor[pi.priority]}`}
-                              >
-                                {pi.priority}
-                              </span>
-                              <span className={`text-sm ${done ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
-                                {block.label}
-                              </span>
-                              {isActive && (
-                                <span className="inline-flex items-center gap-1 rounded bg-gray-900 px-2 py-0.5 text-[10px] font-medium text-white animate-pulse">
-                                  ● FOCUS
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-3 mt-0.5">
-                              <span className="text-xs text-gray-400">{pi.estimatedDuration} min</span>
-                              {pi.startTime && (
-                                <span className="text-xs text-gray-400">Start: {pi.startTime}</span>
-                              )}
-                              {focusMs > 0 && (
-                                <span className="text-xs text-gray-400">
-                                  Focused: {formatFocusTime(focusMs)}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="flex flex-col items-center justify-between shrink-0">
-                            <div className="flex flex-col items-center border-b border-gray-100 pb-1.5 mb-1.5">
-                              <button
-                                onClick={() => movePlanItem(pi.id, 'up')}
-                                disabled={isFirst}
-                                className="p-0.5 text-gray-400 hover:text-gray-900 disabled:text-gray-200 disabled:cursor-not-allowed transition-colors text-sm leading-none"
-                              >
-                                ▲
-                              </button>
-                              <button
-                                onClick={() => movePlanItem(pi.id, 'down')}
-                                disabled={isLast}
-                                className="p-0.5 text-gray-400 hover:text-gray-900 disabled:text-gray-200 disabled:cursor-not-allowed transition-colors text-sm leading-none"
-                              >
-                                ▼
-                              </button>
-                            </div>
-                            <div className="flex flex-col gap-1">
-                              <Button
-                                variant={isActive ? 'secondary' : 'primary'}
-                                size="sm"
-                                onClick={() => handleFocus(pi)}
-                              >
-                                {isActive ? 'Stop' : 'Focus'}
-                              </Button>
-                              <Button variant="ghost" size="sm" onClick={() => setEditItem(pi)}>Edit</Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => removeFromPlan(pi.id)}
-                                className="text-red-400 hover:text-red-600 hover:bg-red-50"
-                              >
-                                Remove
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      </Card>
-                    </div>
-                  </div>
+                  </Card>
                 )
-              })}
-            </div>
+              }
+
+              const pi = block.planItem
+              const wi = workItems.find((w) => w.id === pi.workItemId)
+              const done = wi?.status === 'completed'
+              const isActive = activeWorkItemId === pi.workItemId
+              const focusMs = focusSessions
+                .filter((s) => s.workItemId === pi.workItemId && s.duration > 0)
+                .reduce((sum, s) => sum + s.duration, 0)
+              const isDragging = dragTaskId === pi.id
+
+              return (
+                <div
+                  key={pi.id}
+                  draggable
+                  onDragStart={() => handleTaskDragStart(pi.id)}
+                  onDragEnd={() => setDragTaskId(null)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    handleTaskDrop(pi.id)
+                  }}
+                  className={isDragging ? 'opacity-50' : ''}
+                >
+                  <Card
+                    className={`transition-all hover:border-gray-300 hover:shadow-md cursor-grab active:cursor-grabbing ${
+                      isActive ? 'ring-2 ring-gray-900 bg-gray-50' : ''
+                    } ${done ? 'opacity-75' : ''}`}
+                  >
+                    <div className="flex gap-3">
+                      <div className="flex flex-col items-center gap-1 pt-1 text-gray-300">
+                        <span className="text-xs select-none" title="Drag to reorder">
+                          ⠿
+                        </span>
+                        <Checkbox
+                          checked={done}
+                          onChange={() => toggleWorkItem(pi.workItemId)}
+                        />
+                      </div>
+
+                      <div
+                        className={`shrink-0 w-1 self-stretch rounded-full ${priorityColor[pi.priority]}`}
+                      />
+
+                      <div className="flex-1 min-w-0 py-0.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span
+                            className={`rounded px-1.5 py-0.5 text-[10px] font-bold text-white ${priorityColor[pi.priority]}`}
+                          >
+                            {pi.priority}
+                          </span>
+                          <p className={`text-sm font-medium ${done ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
+                            {block.title}
+                          </p>
+                          {isActive && (
+                            <span className="inline-flex items-center gap-1 rounded bg-gray-900 px-2 py-0.5 text-[10px] font-medium text-white animate-pulse">
+                              ● FOCUS
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1 tabular-nums">
+                          {pi.estimatedDuration} minutes
+                          {focusMs > 0 && (
+                            <span className="text-gray-400"> · Focused {formatFocusTime(focusMs)}</span>
+                          )}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-col gap-1 shrink-0">
+                        <Button
+                          variant={isActive ? 'secondary' : 'primary'}
+                          size="sm"
+                          onClick={() => handleFocus(pi)}
+                        >
+                          {isActive ? 'Stop' : 'Focus'}
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setEditItem(pi)}>
+                          Edit
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleAddBreakAfter(pi.id)}
+                          className="text-gray-500"
+                        >
+                          + Break
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeFromPlan(pi.id)}
+                          className="text-red-400 hover:text-red-600 hover:bg-red-50"
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                </div>
+              )
+            })}
           </div>
-        </div>
-      )}
+        )}
+      </section>
 
       {editItem && (
         <EditPlanItemModal
+          key={editItem.id + editItem.estimatedDuration + editItem.priority}
           item={editItem}
           onSave={handleSave}
           onClose={() => setEditItem(null)}

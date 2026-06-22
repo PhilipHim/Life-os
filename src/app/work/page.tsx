@@ -22,8 +22,8 @@ type ViewMode = 'all' | 'active' | 'completed'
 
 export default function WorkPage() {
   const {
-    workItems, addWorkItem, addRecurringWorkItem, toggleWorkItem, deleteWorkItem,
-    restoreWorkItem, permanentDeleteWorkItem, deleteAllCompleted,
+    workItems, addWorkItem, toggleWorkItem, deleteWorkItem,
+    restoreWorkItem, permanentDeleteWorkItem,
     getChildren, addChildToGroup, removeChildFromGroup, unassignedSingles,
     createGroupWithChildren, recurringTemplates,
   } = useWorkItems()
@@ -47,8 +47,6 @@ export default function WorkPage() {
   const [showDeleted, setShowDeleted] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [viewFilter, setViewFilter] = useState<ViewMode>('all')
-  const [taskType, setTaskType] = useState<'one-time' | 'daily' | 'weekly'>('one-time')
-  const [selectedDays, setSelectedDays] = useState<number[]>([1, 2, 3, 4, 5])
   const [recurringRefreshKey, setRecurringRefreshKey] = useState(0)
 
   const todayRecurringInstances = useMemo(
@@ -76,16 +74,9 @@ export default function WorkPage() {
     e.preventDefault()
     const title = input.trim()
     if (!title) return
-    if (taskType === 'daily') {
-      addRecurringWorkItem(title, singleDescription.trim(), 'daily')
-    } else if (taskType === 'weekly') {
-      addRecurringWorkItem(title, singleDescription.trim(), 'weekly', selectedDays)
-    } else {
-      addWorkItem(title, 'single', singleDescription.trim() || undefined)
-    }
+    addWorkItem(title, 'single', singleDescription.trim() || undefined)
     setInput('')
     setSingleDescription('')
-    setTaskType('one-time')
   }
 
   const addTaskRow = () => {
@@ -206,65 +197,6 @@ export default function WorkPage() {
               rows={2}
               className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-1"
             />
-            <div>
-              <p className="text-xs font-medium uppercase tracking-widest text-gray-400 mb-2">Task Type</p>
-              <div className="flex gap-2">
-                {([
-                  { value: 'one-time', label: 'One-Time' },
-                  { value: 'daily', label: 'Daily' },
-                  { value: 'weekly', label: 'Weekly' },
-                ] as const).map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setTaskType(opt.value)}
-                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
-                      taskType === opt.value
-                        ? 'bg-gray-900 text-white shadow-sm'
-                        : 'border border-gray-200 text-gray-600 hover:border-gray-300'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            {taskType === 'weekly' && (
-              <div className="space-y-2 pl-6 border-l-2 border-blue-100">
-                <p className="text-xs text-gray-500">Select days</p>
-                <div className="flex gap-1">
-                  {[
-                    { value: 0, label: 'Sun' },
-                    { value: 1, label: 'Mon' },
-                    { value: 2, label: 'Tue' },
-                    { value: 3, label: 'Wed' },
-                    { value: 4, label: 'Thu' },
-                    { value: 5, label: 'Fri' },
-                    { value: 6, label: 'Sat' },
-                  ].map((day) => {
-                    const isSelected = selectedDays.includes(day.value)
-                    return (
-                      <button
-                        key={day.value}
-                        type="button"
-                        onClick={() => {
-                          setSelectedDays((prev) =>
-                            isSelected ? prev.filter((d) => d !== day.value) : [...prev, day.value]
-                          )
-                        }}
-                        className={`rounded-lg px-2 py-1 text-xs font-medium transition-all ${
-                          isSelected
-                            ? 'bg-gray-900 text-white shadow-sm'
-                            : 'border border-gray-200 text-gray-500 hover:border-gray-300'
-                        }`}
-                      >
-                        {day.label}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
             <Button type="submit">Add</Button>
           </form>
         ) : (
@@ -417,49 +349,6 @@ export default function WorkPage() {
 
         {standaloneItems.length === 0 && groupItemsList.length === 0 && todayRecurringInstances.length === 0 && (
           <Card><p className="text-center text-sm text-gray-400 py-6">No items found.</p></Card>
-        )}
-
-        {recurringTemplates.length > 0 && (
-          <div className="space-y-3">
-            <h2 className="text-lg font-semibold text-gray-900">Recurring Templates</h2>
-            {recurringTemplates
-              .filter((i) => i.title.toLowerCase().includes(searchQuery.toLowerCase()))
-              .map((item) => {
-              const stats = computeRecurringTemplateStats(item)
-              return (
-              <Card key={item.id} className="transition-all hover:border-gray-300 hover:shadow-md">
-                <div className="flex items-center gap-4">
-                  <div className="size-5 shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="shrink-0 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-600">
-                        {item.recurrenceType === 'weekly' ? 'Weekly' : 'Daily'}
-                      </span>
-                      {item.recurrenceType === 'weekly' && item.daysOfWeek && (
-                        <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
-                          {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].filter((_, i) => item.daysOfWeek!.includes(i)).join(', ')}
-                        </span>
-                      )}
-                      <p className="text-sm text-gray-900">{item.title}</p>
-                    </div>
-                    {item.description && (
-                      <p className="text-xs text-gray-400 mt-0.5">{item.description}</p>
-                    )}
-                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
-                      <span>{stats.streak} day streak</span>
-                      <span>·</span>
-                      <span>{stats.weeklyCompletionPct}% this week ({stats.weeklyCompleted}/{stats.weeklyDue})</span>
-                    </div>
-                  </div>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="sm" onClick={() => setPanelItem(item)}>Details</Button>
-                    <Button variant="ghost" size="sm" onClick={() => setPlanTargetItem({ id: item.id, title: item.title })} className={plannedIds.has(item.id) ? 'text-green-600' : ''}>Plan</Button>
-                    <Button variant="ghost" size="sm" onClick={() => deleteWorkItem(item.id)} className="text-red-400 hover:text-red-600 hover:bg-red-50">Delete</Button>
-                  </div>
-                </div>
-              </Card>
-            )})}
-          </div>
         )}
 
         {standaloneItems.length > 0 && (

@@ -28,8 +28,9 @@ import type { CharacterArea, JournalEntry } from '@/lib/types'
 import { generateCoachReportAsync, type CoachReport } from '@/lib/coach'
 import Card from '@/components/ui/Card'
 import AICoachCard from '@/components/coach/AICoachCard'
+import DashboardChallengesCard from '@/components/challenges/DashboardChallengesCard'
 
-const PRIORITY_ORDER: Record<string, number> = { H1: 0, H2: 1, M: 2, L: 3 }
+import { orderPlanItems } from '@/lib/planner'
 
 function todayLocal(): string {
   const d = new Date()
@@ -243,10 +244,7 @@ export default function DashboardPage() {
   const habitRate = todayHabitsTotal > 0 ? Math.round((todayHabitsDone / todayHabitsTotal) * 100) : 0
 
   const dailyFocus = useMemo(() => {
-    const sortedPlan = [...todayPlan].sort((a, b) => {
-      if (a.orderIndex !== b.orderIndex) return a.orderIndex - b.orderIndex
-      return PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]
-    })
+    const sortedPlan = orderPlanItems(todayPlan)
 
     const isComplete = (workItemId: string) => {
       const wi = workItems.find((w) => w.id === workItemId)
@@ -460,6 +458,11 @@ export default function DashboardPage() {
             href="/habits/today"
           />
         </div>
+      </div>
+
+      <div>
+        <SectionHeading title="Challenges" href="/profile" linkLabel="View profile" />
+        <DashboardChallengesCard />
       </div>
 
       {/* SECTION 3: Daily Focus */}
