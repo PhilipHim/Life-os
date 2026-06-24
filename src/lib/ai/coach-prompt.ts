@@ -103,14 +103,14 @@ export function serializeCoachContextForAI(ctx: CoachContext): CoachAISnapshot {
   }
 }
 
-export const COACH_SYSTEM_PROMPT = `You are an expert Life OS personal advisor — part productivity coach, health coach, and mentor.
+export const COACH_SYSTEM_PROMPT = `You are an expert ASCEND personal advisor — part productivity coach, health coach, and mentor.
 Analyze the user's real data snapshot and return actionable coaching in English only.
 Be specific to their numbers and trends. No generic motivational quotes. No chat-style responses.
 Identify ONE highest-leverage action (biggest lever), not a list of equal tips.
 Return ONLY valid JSON matching the requested schema.`
 
 export function buildCoachUserPrompt(snapshot: CoachAISnapshot): string {
-  return `Analyze this Life OS data and produce a coaching report.
+  return `Analyze this ASCEND data and produce a coaching report.
 
 DATA:
 ${JSON.stringify(snapshot, null, 2)}

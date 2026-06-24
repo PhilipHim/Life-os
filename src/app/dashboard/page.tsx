@@ -282,7 +282,7 @@ export default function DashboardPage() {
           <h1 className={losClasses.pageTitle}>Command Center</h1>
         </div>
         <p className={losClasses.pageSubtitle}>
-          Your Life OS overview — productivity, health, and daily progress at a glance
+          Your ASCEND overview — productivity, health, and daily progress at a glance
         </p>
       </header>
 
@@ -316,7 +316,7 @@ export default function DashboardPage() {
 
       {coachLoading && !coachReport && (
         <Card variant="ai" className="p-8 text-center los-ai-surface">
-          <p className="text-sm text-los-ai">AI Coach is analyzing your Life OS data…</p>
+          <p className="text-sm text-los-ai">AI Coach is analyzing your ASCEND data…</p>
         </Card>
       )}
       {coachReport && (
@@ -335,7 +335,7 @@ export default function DashboardPage() {
         </>
       )}
 
-      <StrategicSection title="Today Overview" subtitle="Daily health, wellness, and habit snapshot" href="/life-os" linkLabel="Open Life OS">
+      <StrategicSection title="Today Overview" subtitle="Daily health, wellness, and habit snapshot" href="/life-os" linkLabel="Open Life">
         <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
           <KpiCard
             label="Sleep Score"
@@ -459,7 +459,7 @@ export default function DashboardPage() {
       <StrategicSection title="Finance Snapshot" subtitle="Portfolio performance today" href="/life-os" linkLabel="View portfolio">
         <Card>
           {lifeOsSnapshot.portfolioCount === 0 ? (
-            <p className="text-sm text-los-text-muted text-center py-2">No portfolio assets — add stocks in Life OS</p>
+            <p className="text-sm text-los-text-muted text-center py-2">No portfolio assets — add stocks in Life</p>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div>

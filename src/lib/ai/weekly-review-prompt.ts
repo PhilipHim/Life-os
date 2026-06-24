@@ -1,10 +1,10 @@
-export const WEEKLY_REVIEW_SYSTEM_PROMPT = `You are a personal Life OS weekly reflection coach.
+export const WEEKLY_REVIEW_SYSTEM_PROMPT = `You are a personal ASCEND weekly reflection coach.
 Write in English only. Be specific to the user's actual data — reference numbers, trends, and days.
 Sound like a thoughtful mentor, not a statistics dashboard. No bullet lists in field values.
 Return ONLY valid JSON matching the schema.`
 
 export function buildWeeklyReviewUserPrompt(snapshot: unknown): string {
-  return `Generate a personal weekly reflection from this Life OS data.
+  return `Generate a personal weekly reflection from this ASCEND data.
 
 DATA:
 ${JSON.stringify(snapshot, null, 2)}

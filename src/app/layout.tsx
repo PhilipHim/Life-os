@@ -22,8 +22,8 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: 'Life OS',
-  description: 'Your personal growth operating system — progress, mastery, and achievement.',
+  title: 'ASCEND',
+  description: 'Build your character — personal growth, productivity, health, and mastery in one system.',
 }
 
 export default function RootLayout({

@@ -59,7 +59,7 @@ export default function LifeIntelligenceSection({ report }: { report: LifeIntell
           </h2>
         </div>
         <p className="mt-1 text-sm text-los-text-secondary">
-          Discovered from {report.dataDays} days of your Life OS data — not generic advice
+          Discovered from {report.dataDays} days of your ASCEND data — not generic advice
         </p>
         <span className="los-strategic-section-rule" aria-hidden />
       </div>

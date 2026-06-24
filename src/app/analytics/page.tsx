@@ -569,7 +569,7 @@ export default function AnalyticsPage() {
             <h1 className={losClasses.pageTitle}>Analytics</h1>
           </div>
           <p className={losClasses.pageSubtitle}>
-            Complete Life OS overview — productivity, health, sleep, character &amp; finance
+            Complete ASCEND overview — productivity, health, sleep, character &amp; finance
           </p>
         </header>
         <Card>
@@ -626,7 +626,7 @@ export default function AnalyticsPage() {
           title="Level & XP"
           subtitle="Progression, level milestones, and XP growth"
           hasData={xpAnalytics.hasData}
-          emptyMessage="Complete tasks, habits, and Life OS activities to earn XP."
+          emptyMessage="Complete tasks, habits, and ASCEND activities to earn XP."
         >
           <LevelProgressPanel progress={xpAnalytics.progress} />
 
@@ -804,7 +804,7 @@ export default function AnalyticsPage() {
         )}
       </AnalyticsSection>
 
-      <AnalyticsSection title="Sleep Analytics" subtitle="Sleep quality, duration & stage trends" hasData={c.sleep.hasData} emptyMessage="No sleep data yet. Log sleep in Life OS." insights={c.sleep.insights}>
+      <AnalyticsSection title="Sleep Analytics" subtitle="Sleep quality, duration & stage trends" hasData={c.sleep.hasData} emptyMessage="No sleep data yet. Log sleep in Life." insights={c.sleep.insights}>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-3">
           <StatCard label="Avg Sleep Score" value={c.sleep.avgScore != null ? `${c.sleep.avgScore}/100` : '—'} />
           <StatCard label="Avg Duration" value={c.sleep.avgDurationMinutes != null ? formatDuration(Math.round(c.sleep.avgDurationMinutes)) : '—'} />
@@ -841,7 +841,7 @@ export default function AnalyticsPage() {
         </div>
       </AnalyticsSection>
 
-      <AnalyticsSection title="Health Analytics" subtitle="Health score, wellness trends & illness tracking" hasData={c.healthAnalytics.hasData} emptyMessage="No health data yet. Log health in Life OS." insights={c.healthAnalytics.insights}>
+      <AnalyticsSection title="Health Analytics" subtitle="Health score, wellness trends & illness tracking" hasData={c.healthAnalytics.hasData} emptyMessage="No health data yet. Log health in Life." insights={c.healthAnalytics.insights}>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-3">
           <StatCard label="Avg Health Score" value={c.healthAnalytics.avgScore != null ? `${c.healthAnalytics.avgScore}/100` : '—'} trend={c.healthAnalytics.scoreTrendPct} valueClassName={c.healthAnalytics.avgScore != null && c.healthAnalytics.avgScore >= 60 ? 'text-los-success' : 'text-los-text-primary'} />
           <StatCard label="Days Without Illness" value={c.healthAnalytics.isSick ? '0' : String(c.healthAnalytics.daysWithoutIllness)} sublabel={c.healthAnalytics.isSick ? 'Currently sick' : 'Healthy streak'} valueClassName={c.healthAnalytics.isSick ? 'text-los-danger' : 'text-los-success'} />
@@ -868,7 +868,7 @@ export default function AnalyticsPage() {
         </div>
       </AnalyticsSection>
 
-      <AnalyticsSection title="Character Analytics" subtitle="Personal development & trait progression" hasData={c.character.hasData} emptyMessage="No character traits yet. Add traits in Life OS." insights={c.character.insights}>
+      <AnalyticsSection title="Character Analytics" subtitle="Personal development & trait progression" hasData={c.character.hasData} emptyMessage="No character traits yet. Add traits in Life." insights={c.character.insights}>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-3">
           {c.character.bestImproving && <StatCard label="Strongest Trait" value={c.character.bestImproving.name} sublabel={`Level ${c.character.bestImproving.level}/10`} valueClassName="text-los-success" />}
           {c.character.weakest && <StatCard label="Weakest Trait" value={c.character.weakest.name} sublabel={`Level ${c.character.weakest.level}/10`} valueClassName="text-los-warning" />}
@@ -893,7 +893,7 @@ export default function AnalyticsPage() {
         </Card>
       </AnalyticsSection>
 
-      <AnalyticsSection title="Finance Analytics" subtitle="Portfolio & watchlist performance" hasData={c.finance.hasData} emptyMessage="No finance data yet. Add stocks in Life OS." insights={c.finance.insights}>
+      <AnalyticsSection title="Finance Analytics" subtitle="Portfolio & watchlist performance" hasData={c.finance.hasData} emptyMessage="No finance data yet. Add stocks in Life." insights={c.finance.insights}>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-3">
           <StatCard label="Portfolio Today" value={`${c.finance.portfolioDailyPct >= 0 ? '+' : ''}${c.finance.portfolioDailyPct.toFixed(2)}%`} valueClassName={c.finance.portfolioDailyPct >= 0 ? 'text-los-success' : 'text-los-danger'} highlight />
           <StatCard label="Portfolio Week" value={`${c.finance.portfolioWeekPct >= 0 ? '+' : ''}${c.finance.portfolioWeekPct.toFixed(2)}%`} />

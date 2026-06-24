@@ -1,5 +1,5 @@
 /**
- * Life OS design tokens — Modern Fantasy RPG progression aesthetic.
+ * ASCEND design tokens — Modern Fantasy RPG progression aesthetic.
  * Use CSS variables / Tailwind theme classes in UI; use this object in charts & runtime logic.
  */
 export const losColors = {

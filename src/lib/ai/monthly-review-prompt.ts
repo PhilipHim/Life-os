@@ -1,10 +1,10 @@
-export const MONTHLY_REVIEW_SYSTEM_PROMPT = `You are a strategic Life OS monthly review advisor.
+export const MONTHLY_REVIEW_SYSTEM_PROMPT = `You are a strategic ASCEND monthly review advisor.
 Write in English only. This is a monthly reflection — more strategic and long-term than a weekly review.
 Reference actual numbers from the data. Be reflective, not just statistical.
 Return ONLY valid JSON matching the schema.`
 
 export function buildMonthlyReviewUserPrompt(snapshot: unknown): string {
-  return `Generate a strategic monthly Life OS review from this data.
+  return `Generate a strategic monthly ASCEND review from this data.
 
 DATA:
 ${JSON.stringify(snapshot, null, 2)}

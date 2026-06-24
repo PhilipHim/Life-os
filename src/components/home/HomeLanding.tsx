@@ -93,7 +93,7 @@ const vision = [
   },
   {
     title: 'Continuous Self Improvement',
-    description: 'A single operating system for becoming who you want to be.',
+    description: 'A single system for becoming who you want to be.',
   },
 ] as const
 
@@ -131,12 +131,12 @@ export default function HomeLanding() {
       {/* Hero */}
       <section className="relative overflow-hidden rounded-2xl border border-gray-200 bg-gradient-to-br from-white via-white to-gray-50 px-6 py-12 shadow-sm md:px-12 md:py-16">
         <div className="relative max-w-2xl">
-          <SectionLabel>Personal Operating System</SectionLabel>
+          <SectionLabel>Personal Growth System</SectionLabel>
           <h1 className="mt-4 text-4xl font-bold tracking-tight text-gray-900 md:text-5xl lg:text-6xl">
-            Life OS
+            ASCEND
           </h1>
           <p className="mt-4 text-lg font-medium leading-relaxed text-gray-700 md:text-xl">
-            Build a better life through systems, data and intentional growth.
+            Build your character through systems, data, and intentional growth.
           </p>
           <p className="mt-3 max-w-xl text-sm leading-relaxed text-gray-500 md:text-base">
             One place to plan your day, track habits, monitor health, manage finances,
@@ -159,8 +159,8 @@ export default function HomeLanding() {
         <h2 className="mt-2 text-2xl font-bold tracking-tight text-gray-900 md:text-3xl">Built by Philip</h2>
         <Card className="mt-6 p-6 md:p-8">
           <p className="text-sm leading-relaxed text-gray-600 md:text-base">
-            Life OS was created as a personal operating system to combine productivity, health,
-            learning, finance and personal growth into one place. Instead of juggling separate apps
+            ASCEND was created to combine productivity, health,
+            learning, finance, and personal growth into one place. Instead of juggling separate apps
             and scattered notes, it brings daily execution and long-term reflection together —
             so you can see the full picture and improve with intention.
           </p>
@@ -195,7 +195,7 @@ export default function HomeLanding() {
           Measure. Improve. Reflect. Repeat.
         </h2>
         <p className="mt-3 max-w-2xl text-sm leading-relaxed text-gray-500 md:text-base">
-          Life OS is built on a simple loop: capture honest data, act on what it shows,
+          ASCEND is built on a simple loop: capture honest data, act on what it shows,
           reflect on the results, and refine your systems over time.
         </p>
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -212,7 +212,7 @@ export default function HomeLanding() {
       <section>
         <SectionLabel>Project Vision</SectionLabel>
         <h2 className="mt-2 text-2xl font-bold tracking-tight text-gray-900 md:text-3xl">
-          Where Life OS is heading
+          Where ASCEND is heading
         </h2>
         <p className="mt-2 max-w-2xl text-sm text-gray-500 md:text-base">
           This is an evolving platform — focused on helping you make better decisions with

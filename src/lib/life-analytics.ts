@@ -320,7 +320,7 @@ export function computeFinanceAnalytics(assets: Asset[], watchlist: Asset[]): Fi
 
   const insights: string[] = []
   if (assets.length === 0 && watchlist.length === 0) {
-    insights.push('Add stocks in Life OS to track portfolio performance.')
+    insights.push('Add stocks in Life to track portfolio performance.')
   } else {
     if (portfolioPerf.dailyChangePct > 0) {
       insights.push(`Portfolio up ${portfolioPerf.dailyChangePct.toFixed(2)}% today.`)

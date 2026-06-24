@@ -7,9 +7,9 @@ import { CompassIcon } from '@/design-system/icons'
 const links = [
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/work', label: 'Work' },
-  { href: '/plan', label: 'Plan' },
+  { href: '/plan', label: 'Planner' },
   { href: '/habits', label: 'Habits' },
-  { href: '/life-os', label: 'Life OS' },
+  { href: '/life-os', label: 'Life' },
   { href: '/analytics', label: 'Analytics' },
   { href: '/profile', label: 'Profile' },
 ]
@@ -30,10 +30,10 @@ export default function Navbar() {
             <CompassIcon size={20} className="text-los-gold" />
           </span>
           <span className="flex flex-col gap-0.5">
-            <span className="font-heading text-lg font-semibold tracking-[0.12em] text-los-text-primary transition-colors group-hover:text-los-gold">
-              Life OS
+            <span className="font-heading text-lg font-semibold tracking-[0.14em] text-los-text-primary transition-colors group-hover:text-los-gold">
+              ASCEND
             </span>
-            <span className="los-brand-rule" aria-hidden />
+            <span className="los-brand-subtitle">Build Your Character</span>
           </span>
         </Link>
 

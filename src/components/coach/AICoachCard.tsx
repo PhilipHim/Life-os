@@ -93,7 +93,7 @@ export default function AICoachCard({ report, loading, poweredByGemini }: AICoac
             </span>
             <div>
               <h2 className="font-heading text-xl font-bold tracking-wide text-los-text-primary">AI Coach</h2>
-              <AIBadge label="Personal Life OS advisor" poweredByGemini={poweredByGemini} />
+              <AIBadge label="Personal ASCEND advisor" poweredByGemini={poweredByGemini} />
             </div>
           </div>
           {loading && <span className="text-[10px] text-los-ai animate-pulse shrink-0">Updating…</span>}

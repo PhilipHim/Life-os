@@ -2,9 +2,9 @@ import type { Metadata } from 'next'
 import HomeLanding from '@/components/home/HomeLanding'
 
 export const metadata: Metadata = {
-  title: 'Life OS — Build a better life through systems',
+  title: 'ASCEND — Build Your Character',
   description:
-    'Life OS combines productivity, health, learning, finance and personal growth into one personal operating system.',
+    'ASCEND combines productivity, health, learning, finance, and personal growth into one personal growth system.',
 }
 
 export default function Home() {

@@ -80,7 +80,7 @@ export default function ProfilePage() {
     <div className="los-page space-y-12">
       <header className="los-page-header">
         <h1 className="los-page-title">Profile</h1>
-        <p className="text-los-text-secondary">Your identity, progress, and growth inside Life OS.</p>
+        <p className="text-los-text-secondary">Your identity, progress, and growth in ASCEND.</p>
       </header>
 
       <LevelHero displayName={displayName} onNameChange={handleNameChange} progress={progress} />

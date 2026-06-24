@@ -135,7 +135,8 @@ export default function LifeOsPage() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-4xl font-bold tracking-tight">Life OS</h1>
+      <h1 className="text-4xl font-bold tracking-tight">Life</h1>
+      <p className="text-sm text-gray-500">Journal, health, sleep, finance, and character development</p>
 
       <div className="flex gap-1 border-b border-gray-200 overflow-x-auto">
         {TABS.map((t) => (
