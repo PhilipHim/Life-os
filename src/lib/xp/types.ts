@@ -7,6 +7,7 @@ export type XpSource =
   | 'workout'
   | 'health'
   | 'challenge'
+  | 'mission'
 
 export interface XpEvent {
   id: string

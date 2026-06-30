@@ -1,6 +1,0 @@
-export { default as LevelHero } from '@/components/progression/LevelHero'
-export { default as LevelProgressPanel } from '@/components/progression/LevelProgressPanel'
-export { default as XpStatCard } from '@/components/progression/XpStatCard'
-export { default as AchievementCard } from '@/components/progression/AchievementCard'
-export { default as TitleCard } from '@/components/progression/TitleCard'
-export { ProgressionSection, ProgressionSubheading } from '@/components/progression/ProgressionSection'

@@ -1,9 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { useHabits } from '@/lib/HabitContext'
+import { useHabits } from '@/contexts/HabitContext'
 import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
+import EmptyState from '@/components/common/EmptyState'
+import PageHeader from '@/components/layout/PageHeader'
 
 function PlusIcon() {
   return (
@@ -66,39 +68,36 @@ export default function HabitsPage() {
   const deletedHabits = habits.filter((h) => h.status === 'deleted')
 
   return (
-    <div className="space-y-10">
-      <div className="flex items-center justify-between">
-        <h1 className="text-4xl font-bold tracking-tight">Habits</h1>
-        <Button onClick={() => setShowForm((p) => !p)}>
-          {showForm ? 'Close' : 'New Habit'}
-        </Button>
-      </div>
+    <div className="los-page space-y-10">
+      <PageHeader title="Habits" subtitle="Build positive routines and break bad ones.">
+        <Button onClick={() => setShowForm((p) => !p)}>{showForm ? 'Close' : 'New Habit'}</Button>
+      </PageHeader>
 
       {showForm && (
         <Card>
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">New Habit</h2>
+          <h2 className="text-lg font-semibold text-los-text-primary mb-4">New Habit</h2>
           <form onSubmit={handleCreate} className="space-y-4">
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Title..."
-              className="min-h-[44px] w-full rounded-lg border border-gray-300 bg-white px-4 text-sm placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-1"
+              className="los-input min-h-[44px] w-full"
             />
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Description (optional)..."
               rows={2}
-              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-1"
+              className="los-textarea w-full"
             />
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <p className="text-xs font-medium uppercase tracking-widest text-gray-400 mb-2">Category</p>
+                <p className="los-section-label mb-2">Category</p>
                 <select
                   value={kind}
                   onChange={(e) => setKind(e.target.value as 'build' | 'avoid')}
-                  className="min-h-[44px] w-full rounded-lg border border-gray-300 bg-white px-4 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-1"
+                  className="los-select min-h-[44px] w-full"
                 >
                   <option value="build">Build</option>
                   <option value="avoid">Avoid</option>
@@ -106,11 +105,11 @@ export default function HabitsPage() {
               </div>
               {kind === 'build' && (
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-widest text-gray-400 mb-2">Type</p>
+                  <p className="los-section-label mb-2">Type</p>
                   <select
                     value={type}
                     onChange={(e) => setType(e.target.value as 'checkbox' | 'time' | 'quantity')}
-                    className="min-h-[44px] w-full rounded-lg border border-gray-300 bg-white px-4 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-1"
+                    className="los-select min-h-[44px] w-full"
                   >
                     <option value="checkbox">Checkbox</option>
                     <option value="time">Time (min)</option>
@@ -121,7 +120,7 @@ export default function HabitsPage() {
             </div>
             {kind === 'build' && type !== 'checkbox' && (
               <div>
-                <p className="text-xs font-medium uppercase tracking-widest text-gray-400 mb-2">
+                <p className="los-section-label mb-2">
                   {type === 'time' ? 'Target (minutes)' : 'Target (quantity)'}
                 </p>
                 <input
@@ -130,7 +129,7 @@ export default function HabitsPage() {
                   onChange={(e) => setTargetValue(e.target.value)}
                   placeholder="e.g. 60"
                   min={1}
-                  className="min-h-[44px] w-full rounded-lg border border-gray-300 bg-white px-4 text-sm placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-1"
+                  className="los-input min-h-[44px] w-full"
                 />
               </div>
             )}
@@ -142,14 +141,17 @@ export default function HabitsPage() {
       )}
 
       {activeHabits.length === 0 && !showForm && (
-        <Card>
-          <p className="text-center text-sm text-gray-400 py-6">No habits yet. Create your first habit.</p>
-        </Card>
+        <EmptyState
+          title="Start a habit streak"
+          action={{ label: 'Create your first habit', onClick: () => setShowForm(true) }}
+        >
+          You haven&apos;t created any habits yet. Small daily habits compound into big wins.
+        </EmptyState>
       )}
 
       {buildHabits.length > 0 && (
         <div>
-          <p className="text-xs font-medium uppercase tracking-widest text-gray-400 mb-4">Build Habits</p>
+          <p className="los-section-label mb-4">Build Habits</p>
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {buildHabits.map((habit) => {
               const entry = getEntryForHabit(habit.id)
@@ -160,27 +162,28 @@ export default function HabitsPage() {
                 : done ? 100 : 0
 
               return (
-                <Card key={habit.id} className="relative transition-all hover:border-gray-300 hover:shadow-md">
+                <Card key={habit.id} className="relative transition-all hover:border-los-border hover:shadow-los-card-hover">
                   <button
                     onClick={() => deleteHabit(habit.id)}
-                    className="absolute top-3 right-3 rounded p-1 text-gray-300 hover:text-gray-500 hover:bg-gray-100 transition-colors"
+                    className="absolute top-3 right-3 rounded p-1 text-los-text-muted/70 hover:text-los-text-secondary hover:bg-los-bg-secondary transition-colors"
                     title="Move to trash"
+                    aria-label={`Move ${habit.title} to trash`}
                   >
                     <XIcon />
                   </button>
                   <div className="space-y-3">
                     <div className="flex items-start justify-between gap-2 pr-6">
-                      <p className="font-semibold text-gray-900">{habit.title}</p>
+                      <p className="font-semibold text-los-text-primary">{habit.title}</p>
                       <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs text-emerald-600">Build</span>
                     </div>
                     <div className="flex items-center gap-3">
-                      <div className="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                      <div className="flex-1 h-1.5 rounded-full bg-los-bg-secondary overflow-hidden">
                         <div
-                          className={`h-full rounded-full transition-all ${done ? 'bg-green-500' : 'bg-gray-900'}`}
+                          className={`h-full rounded-full transition-all ${done ? 'bg-green-500' : 'los-progress-gold'}`}
                           style={{ width: `${progress}%` }}
                         />
                       </div>
-                      <span className="shrink-0 text-xs text-gray-400">
+                      <span className="shrink-0 text-xs text-los-text-muted">
                         {habit.type === 'time' ? `${currentValue}/${habit.targetValue} min` :
                          habit.type === 'quantity' ? `${currentValue}/${habit.targetValue}` :
                          done ? '✔' : '—'}
@@ -214,7 +217,7 @@ export default function HabitsPage() {
                             name="value"
                             type="number"
                             placeholder="Quantity"
-                            className="min-h-[36px] min-w-0 flex-1 rounded-lg border border-gray-300 bg-white px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-1"
+                            className="los-input min-h-[36px] min-w-0 flex-1"
                           />
                           <Button type="submit" variant="secondary" size="sm">OK</Button>
                         </form>
@@ -230,24 +233,25 @@ export default function HabitsPage() {
 
       {avoidHabits.length > 0 && (
         <div>
-          <p className="text-xs font-medium uppercase tracking-widest text-gray-400 mb-4">Avoid Habits</p>
+          <p className="los-section-label mb-4">Avoid Habits</p>
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {avoidHabits.map((habit) => {
               const entry = getEntryForHabit(habit.id)
               const avoided = isHabitSuccessful(habit.id)
 
               return (
-                <Card key={habit.id} className="relative transition-all hover:border-gray-300 hover:shadow-md">
+                <Card key={habit.id} className="relative transition-all hover:border-los-border hover:shadow-los-card-hover">
                   <button
                     onClick={() => deleteHabit(habit.id)}
-                    className="absolute top-3 right-3 rounded p-1 text-gray-300 hover:text-gray-500 hover:bg-gray-100 transition-colors"
+                    className="absolute top-3 right-3 rounded p-1 text-los-text-muted/70 hover:text-los-text-secondary hover:bg-los-bg-secondary transition-colors"
                     title="Move to trash"
+                    aria-label={`Move ${habit.title} to trash`}
                   >
                     <XIcon />
                   </button>
                   <div className="space-y-3">
                     <div className="flex items-start justify-between gap-2 pr-6">
-                      <p className="font-semibold text-gray-900">{habit.title}</p>
+                      <p className="font-semibold text-los-text-primary">{habit.title}</p>
                       <span className="shrink-0 rounded-full bg-rose-50 px-2.5 py-0.5 text-xs text-rose-600">Avoid</span>
                     </div>
                     {entry && (
@@ -281,7 +285,7 @@ export default function HabitsPage() {
         <div>
           <button
             onClick={() => setShowTrash((p) => !p)}
-            className="flex items-center justify-between w-full text-sm text-gray-400 hover:text-gray-700 transition-colors mb-4"
+            className="flex items-center justify-between w-full text-sm text-los-text-muted hover:text-los-text-primary transition-colors mb-4"
           >
             <span className="font-medium">Deleted Habits ({deletedHabits.length})</span>
             <svg
@@ -297,11 +301,11 @@ export default function HabitsPage() {
                 {deletedHabits.map((habit) => (
                   <Card key={habit.id} className="opacity-60">
                     <div className="space-y-2">
-                      <p className="font-semibold text-gray-900">{habit.title}</p>
+                      <p className="font-semibold text-los-text-primary">{habit.title}</p>
                       {habit.description && (
-                        <p className="text-sm text-gray-500">{habit.description}</p>
+                        <p className="text-sm text-los-text-secondary">{habit.description}</p>
                       )}
-                      <p className="text-xs text-gray-400">
+                      <p className="text-xs text-los-text-muted">
                         {habit.kind === 'build' ? 'Build' : 'Avoid'} · {habit.type}
                         {habit.type !== 'checkbox' && ` · Target: ${habit.targetValue}`}
                       </p>
@@ -310,10 +314,9 @@ export default function HabitsPage() {
                           Restore
                         </Button>
                         <Button
-                          variant="ghost"
+                          variant="dangerGhost"
                           size="sm"
                           onClick={() => permanentDeleteHabit(habit.id)}
-                          className="text-red-400 hover:text-red-600 hover:bg-red-50"
                         >
                           Permanently Delete
                         </Button>

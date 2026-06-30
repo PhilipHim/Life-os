@@ -1,10 +1,14 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import Card from '@/components/ui/Card'
-import { StatCard } from '@/components/analytics/AnalyticsSection'
+import Button from '@/components/ui/Button'
+import PageHeader from '@/components/layout/PageHeader'
+import { useAuth } from '@/hooks/useAuth'
+import { StatCard } from '@/components/features/analytics/AnalyticsSection'
 import { buildProfileData, type ProfileData } from '@/lib/profile'
-import ChallengeCard from '@/components/challenges/ChallengeCard'
+import ChallengeCard from '@/components/features/challenges/ChallengeCard'
 import {
   LevelHero,
   XpStatCard,
@@ -12,13 +16,21 @@ import {
   TitleCard,
   ProgressionSection,
   ProgressionSubheading,
-} from '@/components/progression'
-import { getProfileSettings, saveProfileSettings, saveActiveTitle } from '@/lib/db/profile'
+} from '@/components/features/progression'
+import { getProfileSettings, saveProfileSettings, saveActiveTitle } from '@/database/profile'
 import { StarIcon, MountainIcon, CrownIcon, TrophyIcon } from '@/design-system/icons'
 
 export default function ProfilePage() {
+  const router = useRouter()
+  const { signOut } = useAuth()
   const [displayName, setDisplayName] = useState('Explorer')
   const [profile, setProfile] = useState<ProfileData | null>(null)
+
+  const handleSignOut = async () => {
+    await signOut()
+    router.push('/login')
+    router.refresh()
+  }
 
   const refresh = useCallback(() => {
     setProfile(buildProfileData())
@@ -54,11 +66,9 @@ export default function ProfilePage() {
   if (!profile) {
     return (
       <div className="los-page space-y-8">
-        <header className="los-page-header">
-          <h1 className="los-page-title">Profile</h1>
-        </header>
-        <Card>
-          <p className="text-center text-sm text-los-text-muted py-8">Loading profile…</p>
+        <PageHeader title="Profile" />
+        <Card variant="ai" className="p-8 text-center los-ai-surface">
+          <p className="text-sm text-los-ai animate-pulse">Loading profile…</p>
         </Card>
       </div>
     )
@@ -78,10 +88,14 @@ export default function ProfilePage() {
 
   return (
     <div className="los-page space-y-12">
-      <header className="los-page-header">
-        <h1 className="los-page-title">Profile</h1>
-        <p className="text-los-text-secondary">Your identity, progress, and growth in ASCEND.</p>
-      </header>
+      <PageHeader
+        title="Profile"
+        subtitle="Your identity, progress, and growth in ASCEND."
+      >
+        <Button type="button" variant="ghost" size="sm" onClick={() => void handleSignOut()}>
+          Log out
+        </Button>
+      </PageHeader>
 
       <LevelHero displayName={displayName} onNameChange={handleNameChange} progress={progress} />
 

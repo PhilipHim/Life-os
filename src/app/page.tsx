@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import HomeLanding from '@/components/home/HomeLanding'
+import HomeLanding from '@/components/features/home/HomeLanding'
 
 export const metadata: Metadata = {
   title: 'ASCEND — Build Your Character',

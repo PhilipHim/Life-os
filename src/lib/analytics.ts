@@ -1,5 +1,5 @@
-import type { WorkItem } from '@/lib/types'
-import { getWorkItems } from '@/lib/db/work-items'
+import type { WorkItem } from '@/types'
+import { getWorkItems } from '@/database/work-items'
 import { getSessions } from '@/lib/focus'
 import { calculateDailyScore } from '@/lib/score'
 

@@ -27,3 +27,7 @@ export function syncTitleUnlocks(newlyUnlocked: { id: string; timestamp: number 
   }
   return unlocks
 }
+
+export function unlockTitleById(id: string, timestamp = Date.now()): TitleUnlocks {
+  return syncTitleUnlocks([{ id, timestamp }])
+}

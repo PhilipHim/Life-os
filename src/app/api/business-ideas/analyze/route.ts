@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
-import { generateGeminiJSON, isGeminiConfigured } from '@/lib/ai/gemini-server'
-import { BUSINESS_SYSTEM_PROMPT, buildBusinessUserPrompt } from '@/lib/ai/business-prompt'
-import { normalizeBusinessAnalysis } from '@/lib/ai/validate-business-response'
-import type { BusinessIdea, BusinessIdeaAnalysis } from '@/lib/types'
+import { generateGeminiJSON, isGeminiConfigured } from '@/ai/gemini-server'
+import { BUSINESS_SYSTEM_PROMPT, buildBusinessUserPrompt } from '@/ai/business-prompt'
+import { normalizeBusinessAnalysis } from '@/ai/validate-business-response'
+import type { BusinessIdea, BusinessIdeaAnalysis } from '@/types'
 
 export async function POST(request: Request) {
   if (!isGeminiConfigured()) {

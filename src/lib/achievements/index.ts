@@ -70,6 +70,8 @@ export function groupAchievementsByCategory(
       journal: [] as Achievement[],
       health: [] as Achievement[],
       habit: [] as Achievement[],
+      focus: [] as Achievement[],
+      routine: [] as Achievement[],
     }
   )
 }

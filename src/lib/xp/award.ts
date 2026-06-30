@@ -1,11 +1,11 @@
 import { XP_REWARDS, HIGH_PRIORITIES } from '@/lib/xp/constants'
 import { tryAwardXp } from '@/lib/xp/state'
 import { syncChallenges } from '@/lib/challenges'
-import { getDailyPlanItems } from '@/lib/db/daily-plan'
-import { getHabits } from '@/lib/db/habits'
-import { getEntries as getHabitEntries } from '@/lib/db/habit-entries'
+import { getDailyPlanItems } from '@/database/daily-plan'
+import { getHabits } from '@/database/habits'
+import { getEntries as getHabitEntries } from '@/database/habit-entries'
 import { computeHealthScore } from '@/lib/health-score'
-import type { HealthEntry, SleepEntry } from '@/lib/types'
+import type { HealthEntry, SleepEntry } from '@/types'
 
 function todayStr(): string {
   const d = new Date()

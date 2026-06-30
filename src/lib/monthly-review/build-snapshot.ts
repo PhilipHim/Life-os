@@ -1,12 +1,12 @@
 import { getDailyStats } from '@/lib/analytics'
 import { computeLifeScore } from '@/lib/life-score'
 import { computeHabitScoreForDate } from '@/lib/score'
-import { getSleepEntries } from '@/lib/db/sleep'
-import { getHealthEntries } from '@/lib/db/health'
-import { getHealthEvents, computeHealthStatus } from '@/lib/db/health-illness'
-import { getJournalEntries } from '@/lib/db/journal'
-import { getCharacterAreas } from '@/lib/db/character'
-import { getAssets, getWatchlistAssets } from '@/lib/db/finance'
+import { getSleepEntries } from '@/database/sleep'
+import { getHealthEntries } from '@/database/health'
+import { getHealthEvents, computeHealthStatus } from '@/database/health-illness'
+import { getJournalEntries } from '@/database/journal'
+import { getCharacterAreas } from '@/database/character'
+import { getAssets, getWatchlistAssets } from '@/database/finance'
 import {
   computeFinanceAnalytics,
   computeCharacterAnalytics,

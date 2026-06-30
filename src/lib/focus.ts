@@ -1,4 +1,4 @@
-import type { FocusSession } from '@/lib/types'
+import type { FocusSession } from '@/types'
 
 const STORAGE_KEY = 'focus_sessions'
 

@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
-import { generateGeminiJSON, isGeminiConfigured } from '@/lib/ai/gemini-server'
+import { generateGeminiJSON, isGeminiConfigured } from '@/ai/gemini-server'
 import {
   COACH_SYSTEM_PROMPT,
   buildCoachUserPrompt,
   type CoachAISnapshot,
-} from '@/lib/ai/coach-prompt'
+} from '@/ai/coach-prompt'
 
 export async function POST(request: Request) {
   if (!isGeminiConfigured()) {

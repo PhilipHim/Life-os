@@ -7,9 +7,10 @@ import {
   estimateAvgDailyTasks,
   estimateWeeklyTaskPace,
 } from '@/lib/challenges/progress'
-import { getHabits } from '@/lib/db/habits'
-import { getSleepEntries } from '@/lib/db/sleep'
-import { getHealthEntries } from '@/lib/db/health'
+import { getHabits } from '@/database/habits'
+import { getSleepEntries } from '@/database/sleep'
+import { getAllSessions } from '@/lib/focus'
+import { getHealthEntries } from '@/database/health'
 import { generateDailyChallenges, generateWeeklyChallenges, getTemplateById } from '@/lib/challenges/generate'
 import {
   loadChallengeStorage,
@@ -28,6 +29,7 @@ function buildGenerationContext(recentTemplateIds: string[]): GenerationContext 
     avgWeeklyTasks: estimateWeeklyTaskPace(),
     hasSleepHistory: getSleepEntries().length > 0,
     hasHealthHistory: getHealthEntries().length > 0,
+    hasFocusHistory: getAllSessions().some((s) => s.duration > 0),
     recentTemplateIds,
   }
 }

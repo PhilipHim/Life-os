@@ -1,4 +1,4 @@
-import type { BusinessIdea, BusinessIdeaAnalysis } from '@/lib/types'
+import type { BusinessIdea, BusinessIdeaAnalysis } from '@/types'
 import type { BusinessAnalysisProvider } from '@/lib/business-coach/types'
 import {
   scoreMarketPotential,

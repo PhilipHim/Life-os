@@ -1,4 +1,4 @@
-export type ChallengeModule = 'tasks' | 'habits' | 'journal' | 'sleep' | 'health'
+export type ChallengeModule = 'tasks' | 'habits' | 'journal' | 'sleep' | 'health' | 'focus' | 'planner'
 export type ChallengePeriod = 'daily' | 'weekly'
 
 export interface ChallengeInstance {
@@ -37,6 +37,7 @@ export interface GenerationContext {
   avgWeeklyTasks: number
   hasSleepHistory: boolean
   hasHealthHistory: boolean
+  hasFocusHistory: boolean
   recentTemplateIds: string[]
 }
 

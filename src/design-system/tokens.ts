@@ -60,15 +60,15 @@ export const losTypography = {
 
 /** Tailwind class bundles for gradual page migration without per-page redesign. */
 export const losClasses = {
-  pageTitle: 'font-heading text-4xl font-bold tracking-tight text-los-text-primary',
+  pageTitle: 'font-heading text-3xl font-bold tracking-tight text-los-text-primary sm:text-4xl',
   pageSubtitle: 'text-sm text-los-text-secondary',
   sectionHeading: 'font-heading text-lg font-semibold tracking-wide text-los-text-primary',
   sectionLabel:
     'text-[10px] font-semibold uppercase tracking-[0.2em] text-los-text-muted',
   body: 'text-sm text-los-text-secondary leading-relaxed',
-  card: 'rounded-xl border border-los-border bg-los-bg-card p-6 shadow-los-card',
+  card: 'rounded-xl border border-los-border bg-los-bg-card p-4 shadow-los-card sm:p-6',
   cardInteractive:
-    'rounded-xl border border-los-border bg-los-bg-card p-6 shadow-los-card transition-all duration-200 hover:border-los-border-gold hover:shadow-los-card-hover',
+    'rounded-xl border border-los-border bg-los-bg-card p-4 shadow-los-card transition-all duration-200 hover:border-los-border-gold hover:shadow-los-card-hover sm:p-6',
   page: 'los-page',
   pageHeader: 'los-page-header',
   main: 'los-main',

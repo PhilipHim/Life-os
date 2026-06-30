@@ -4,16 +4,16 @@ import { useMemo, useState, useEffect } from 'react'
 import { getDailyStats } from '@/lib/analytics'
 import { getUnifiedScore } from '@/lib/score'
 import { computeHealthScore } from '@/lib/health-score'
-import { getWorkItems } from '@/lib/db/work-items'
+import { getWorkItems } from '@/database/work-items'
 import { getAllSessions } from '@/lib/focus'
-import { getHabits } from '@/lib/db/habits'
-import { getEntries } from '@/lib/db/habit-entries'
-import { getHealthEntries } from '@/lib/db/health'
-import { getJournalEntries } from '@/lib/db/journal'
-import { getSleepEntries } from '@/lib/db/sleep'
-import { getHealthEvents } from '@/lib/db/health-illness'
-import { getCharacterAreas } from '@/lib/db/character'
-import { getAssets, getWatchlistAssets } from '@/lib/db/finance'
+import { getHabits } from '@/database/habits'
+import { getEntries } from '@/database/habit-entries'
+import { getHealthEntries } from '@/database/health'
+import { getJournalEntries } from '@/database/journal'
+import { getSleepEntries } from '@/database/sleep'
+import { getHealthEvents } from '@/database/health-illness'
+import { getCharacterAreas } from '@/database/character'
+import { getAssets, getWatchlistAssets } from '@/database/finance'
 import {
   computeSleepAnalytics,
   computeHealthTrendAnalytics,
@@ -27,20 +27,21 @@ import {
   type FinanceAnalytics,
 } from '@/lib/life-analytics'
 import { computeLifeScore } from '@/lib/life-score'
-import AnalyticsSection, { StatCard, TrendBadge, TrendHighlightCard } from '@/components/analytics/AnalyticsSection'
-import { LevelProgressPanel, XpStatCard } from '@/components/progression'
-import { DayTrendCard } from '@/components/strategic'
+import AnalyticsSection, { StatCard, TrendBadge, TrendHighlightCard } from '@/components/features/analytics/AnalyticsSection'
+import { LevelProgressPanel, XpStatCard } from '@/components/features/progression'
+import { DayTrendCard } from '@/components/features/strategic'
 import { CompassIcon } from '@/design-system/icons'
 import { losClasses } from '@/design-system/tokens'
 import Card from '@/components/ui/Card'
+import ContextualHint from '@/components/features/first-experience/ContextualHint'
 import ProgressBar from '@/components/ui/ProgressBar'
-import MiniBarChart from '@/components/analytics/MiniBarChart'
-import AIWeeklyReviewCard from '@/components/analytics/AIWeeklyReviewCard'
+import MiniBarChart from '@/components/features/analytics/MiniBarChart'
+import AIWeeklyReviewCard from '@/components/features/analytics/AIWeeklyReviewCard'
 import { generateWeeklyReviewAsync, buildWeeklyReviewSnapshot, type WeeklyReview } from '@/lib/weekly-review'
 import { generateMonthlyReviewAsync, buildMonthlyReviewSnapshot, type MonthlyReview } from '@/lib/monthly-review'
-import AIMonthlyReviewCard from '@/components/analytics/AIMonthlyReviewCard'
+import AIMonthlyReviewCard from '@/components/features/analytics/AIMonthlyReviewCard'
 import { computeLifeIntelligence } from '@/lib/life-intelligence'
-import LifeIntelligenceSection from '@/components/analytics/LifeIntelligenceSection'
+import LifeIntelligenceSection from '@/components/features/analytics/LifeIntelligenceSection'
 import { computeXpAnalytics } from '@/lib/xp'
 
 function dateStr(date: Date): string {
@@ -591,6 +592,8 @@ export default function AnalyticsPage() {
         </p>
       </header>
 
+      <ContextualHint section="analytics" message="Your long-term progress appears here." />
+
       <LifeIntelligenceSection report={lifeIntelligence} />
 
       {weeklyReviewLoading && !weeklyReview && (
@@ -690,7 +693,7 @@ export default function AnalyticsPage() {
       )}
 
       <AnalyticsSection title="Life Overview" subtitle="Weekly Life Score trend">
-        <div className="grid gap-3 sm:grid-cols-7 mb-4">
+        <div className="grid gap-3 grid-cols-2 sm:grid-cols-4 md:grid-cols-7 mb-4">
           {c.lifeWeekScores.map((d) => (
             <DayTrendCard key={d.date} dayLabel={d.dayLabel} score={d.total} meta={['life']} />
           ))}
@@ -734,7 +737,7 @@ export default function AnalyticsPage() {
       </AnalyticsSection>
 
       <AnalyticsSection title="Productivity Analytics" subtitle="Weekly performance, focus & work output">
-        <div className="grid gap-3 sm:grid-cols-7 mb-3">
+        <div className="grid gap-3 grid-cols-2 sm:grid-cols-4 md:grid-cols-7 mb-3">
           {c.weekDays.map((d) => (
             <DayTrendCard
               key={d.date}

@@ -26,11 +26,24 @@ function meetsCondition(def: TitleDefinition, ctx: TitleContext): boolean {
   switch (def.id) {
     case 'beginner':
       return true
+    case 'the_beginner':
+      return false
+    case 'pathfinder':
+      return (
+        ctx.level >= 2 ||
+        isAchievementUnlocked(ctx, 'first_mission')
+      )
     case 'builder':
       return (
         ctx.level >= 3 ||
         isAchievementUnlocked(ctx, 'first_task') ||
         ctx.stats.longestHabitStreak >= 7
+      )
+    case 'steady_hand':
+      return (
+        ctx.level >= 5 ||
+        isAchievementUnlocked(ctx, 'habit_warrior') ||
+        countUnlockedAchievements(ctx) >= 3
       )
     case 'focused_builder':
       return (
@@ -38,11 +51,23 @@ function meetsCondition(def: TitleDefinition, ctx: TitleContext): boolean {
         isAchievementUnlocked(ctx, 'focused') ||
         ctx.stats.journalEntries >= 30
       )
+    case 'focus_monk':
+      return (
+        ctx.level >= 8 ||
+        isAchievementUnlocked(ctx, 'focus_marathon') ||
+        isAchievementUnlocked(ctx, 'focus_locked_in')
+      )
     case 'disciplined_operator':
       return (
         ctx.level >= 10 ||
         isAchievementUnlocked(ctx, 'consistent') ||
         countUnlockedAchievements(ctx) >= 5
+      )
+    case 'chronicler':
+      return (
+        ctx.level >= 12 ||
+        isAchievementUnlocked(ctx, 'journal_mindful') ||
+        ctx.stats.currentStreaks.journal >= 14
       )
     case 'life_architect':
       return (
@@ -50,12 +75,24 @@ function meetsCondition(def: TitleDefinition, ctx: TitleContext): boolean {
         isAchievementUnlocked(ctx, 'writer') ||
         (ctx.stats.lifeScoreAverage ?? 0) >= 65
       )
+    case 'peak_performer':
+      return (
+        ctx.level >= 18 ||
+        isAchievementUnlocked(ctx, 'master_executor') ||
+        (ctx.stats.productivityScoreAverage ?? 0) >= 75
+      )
     case 'master_architect':
       return (
         ctx.level >= 20 ||
         isAchievementUnlocked(ctx, 'master_executor') ||
         isAchievementUnlocked(ctx, 'iron_health') ||
         ctx.stats.longestHabitStreak >= 30
+      )
+    case 'ascendant':
+      return (
+        ctx.level >= 25 ||
+        countUnlockedAchievements(ctx) >= 12 ||
+        (ctx.stats.lifeScoreAverage ?? 0) >= 75
       )
     default:
       return false

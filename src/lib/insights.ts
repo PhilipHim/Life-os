@@ -1,7 +1,7 @@
-import { getWorkItems } from '@/lib/db/work-items'
+import { getWorkItems } from '@/database/work-items'
 import { getSessions } from '@/lib/focus'
-import { getHabits } from '@/lib/db/habits'
-import { getEntries } from '@/lib/db/habit-entries'
+import { getHabits } from '@/database/habits'
+import { getEntries } from '@/database/habit-entries'
 
 interface Insight {
   type: 'positive' | 'negative' | 'neutral'

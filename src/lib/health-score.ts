@@ -1,4 +1,4 @@
-import type { HealthEntry } from '@/lib/types'
+import type { HealthEntry } from '@/types'
 
 export interface HealthSubScore {
   label: string

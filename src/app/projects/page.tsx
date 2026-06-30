@@ -1,13 +1,13 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import type { Project, Task } from '@/lib/types'
-import { getProjects, addProject, updateProject, deleteProject } from '@/lib/db/projects'
-import { getTasks } from '@/lib/db/tasks'
+import type { Project, Task } from '@/types'
+import { getProjects, addProject, updateProject, deleteProject } from '@/database/projects'
+import { getTasks } from '@/database/tasks'
 import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Checkbox from '@/components/ui/Checkbox'
-import DetailsPanel from '@/components/DetailsPanel'
+import DetailsPanel from '@/components/common/DetailsPanel'
 
 type StatusFilter = 'all' | 'active' | 'completed'
 
@@ -115,14 +115,14 @@ export default function ProjectsPage() {
               value={taskTitle}
               onChange={(e) => setTaskTitle(e.target.value)}
               placeholder="Projekt Titel..."
-              className="min-h-[44px] w-full rounded-lg border border-gray-300 bg-white px-4 text-sm placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-1"
+              className="los-input min-h-[44px] w-full"
             />
             <textarea
               value={taskDescription}
               onChange={(e) => setTaskDescription(e.target.value)}
               placeholder="Beschreibung (optional)..."
               rows={2}
-              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-1"
+              className="los-textarea w-full"
             />
             {tasks.length > 0 ? (
               <div>
@@ -165,21 +165,21 @@ export default function ProjectsPage() {
               value={directTitle}
               onChange={(e) => setDirectTitle(e.target.value)}
               placeholder="Projekt Titel..."
-              className="min-h-[44px] w-full rounded-lg border border-gray-300 bg-white px-4 text-sm placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-1"
+              className="los-input min-h-[44px] w-full"
             />
             <textarea
               value={directDescription}
               onChange={(e) => setDirectDescription(e.target.value)}
               placeholder="Beschreibung (optional)..."
               rows={2}
-              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-1"
+              className="los-textarea w-full"
             />
             <textarea
               value={directNotes}
               onChange={(e) => setDirectNotes(e.target.value)}
               placeholder="Notizen (optional)..."
               rows={3}
-              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-1"
+              className="los-textarea w-full"
             />
             <Button type="submit" disabled={!directTitle.trim()}>Projekt erstellen</Button>
           </form>
@@ -208,7 +208,7 @@ export default function ProjectsPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Projekte durchsuchen..."
-            className="min-h-[40px] max-w-xs rounded-lg border border-gray-300 bg-white px-4 text-sm placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-1"
+            className="los-input min-h-[40px] max-w-xs"
           />
         </div>
 

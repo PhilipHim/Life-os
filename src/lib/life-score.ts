@@ -1,7 +1,7 @@
-import type { JournalEntry, HealthEntry } from '@/lib/types'
+import type { JournalEntry, HealthEntry } from '@/types'
 import { computeHealthScore } from '@/lib/health-score'
-import { getHealthEntryByDate } from '@/lib/db/health'
-import { getJournalEntryByDate } from '@/lib/db/journal'
+import { getHealthEntryByDate } from '@/database/health'
+import { getJournalEntryByDate } from '@/database/journal'
 
 export interface MindScoreResult {
   total: number

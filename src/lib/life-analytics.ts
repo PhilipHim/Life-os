@@ -1,7 +1,7 @@
-import type { SleepEntry, HealthEntry, CharacterArea, Asset } from '@/lib/types'
+import type { SleepEntry, HealthEntry, CharacterArea, Asset } from '@/types'
 import { computeHealthScore } from '@/lib/health-score'
-import { computeHealthStatus } from '@/lib/db/health-illness'
-import { computeStockPerformance, computeAggregatedPerformance } from '@/lib/db/finance'
+import { computeHealthStatus } from '@/database/health-illness'
+import { computeStockPerformance, computeAggregatedPerformance } from '@/database/finance'
 
 function todayLocal(): string {
   const d = new Date()
@@ -164,7 +164,7 @@ export interface HealthTrendAnalytics {
 
 export function computeHealthTrendAnalytics(
   entries: HealthEntry[],
-  events: ReturnType<typeof import('@/lib/db/health-illness').getHealthEvents>
+  events: ReturnType<typeof import('@/database/health-illness').getHealthEvents>
 ): HealthTrendAnalytics {
   const today = new Date()
   const weekDates = getWeekDates(today)

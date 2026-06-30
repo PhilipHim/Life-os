@@ -1,6 +1,6 @@
-import { getHabits } from '@/lib/db/habits'
-import { getEntries as getHabitEntries } from '@/lib/db/habit-entries'
-import { getCharacterAreas } from '@/lib/db/character'
+import { getHabits } from '@/database/habits'
+import { getEntries as getHabitEntries } from '@/database/habit-entries'
+import { getCharacterAreas } from '@/database/character'
 import type {
   DaySnapshot,
   IntelligenceInsight,

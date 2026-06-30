@@ -1,14 +1,14 @@
 import { getDailyStats } from '@/lib/analytics'
 import { getWeeklyReport } from '@/lib/weekly'
 import { computeLifeScore } from '@/lib/life-score'
-import { getSleepEntries } from '@/lib/db/sleep'
-import { getHealthEntries } from '@/lib/db/health'
-import { getHealthEvents } from '@/lib/db/health-illness'
-import { getJournalEntries } from '@/lib/db/journal'
-import { getHabits } from '@/lib/db/habits'
-import { getEntries as getHabitEntries } from '@/lib/db/habit-entries'
-import { getCharacterAreas } from '@/lib/db/character'
-import { getAssets, getWatchlistAssets } from '@/lib/db/finance'
+import { getSleepEntries } from '@/database/sleep'
+import { getHealthEntries } from '@/database/health'
+import { getHealthEvents } from '@/database/health-illness'
+import { getJournalEntries } from '@/database/journal'
+import { getHabits } from '@/database/habits'
+import { getEntries as getHabitEntries } from '@/database/habit-entries'
+import { getCharacterAreas } from '@/database/character'
+import { getAssets, getWatchlistAssets } from '@/database/finance'
 import {
   computeSleepAnalytics,
   computeHealthTrendAnalytics,

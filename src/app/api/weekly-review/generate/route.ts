@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
-import { generateGeminiJSON, isGeminiConfigured } from '@/lib/ai/gemini-server'
+import { generateGeminiJSON, isGeminiConfigured } from '@/ai/gemini-server'
 import {
   WEEKLY_REVIEW_SYSTEM_PROMPT,
   buildWeeklyReviewUserPrompt,
-} from '@/lib/ai/weekly-review-prompt'
-import { normalizeWeeklyReview } from '@/lib/ai/validate-weekly-review'
+} from '@/ai/weekly-review-prompt'
+import { normalizeWeeklyReview } from '@/ai/validate-weekly-review'
 import type { WeeklyReviewSnapshot } from '@/lib/weekly-review/types'
 
 export async function POST(request: Request) {

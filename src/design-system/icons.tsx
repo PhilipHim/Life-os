@@ -81,6 +81,58 @@ export function TrophyIcon(props: IconProps) {
   )
 }
 
+export function GearIcon(props: IconProps) {
+  return (
+    <svg {...baseProps(props)}>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.77 1.05 1.4 1.16H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+    </svg>
+  )
+}
+
+export function SettingsIcon(props: IconProps) {
+  return <GearIcon {...props} />
+}
+
+export function UserIcon(props: IconProps) {
+  return (
+    <svg {...baseProps(props)}>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+    </svg>
+  )
+}
+
+export function PaletteIcon(props: IconProps) {
+  return (
+    <svg {...baseProps(props)}>
+      <circle cx="13.5" cy="6.5" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="17.5" cy="10.5" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="8.5" cy="7.5" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="6.5" cy="12" r="1.5" fill="currentColor" stroke="none" />
+      <path d="M12 2a10 10 0 1 0 8 16h-1.5a2.5 2.5 0 0 1 0-5H17a6 6 0 0 0 2-6 6 6 0 0 0-6-5Z" />
+    </svg>
+  )
+}
+
+export function BellIcon(props: IconProps) {
+  return (
+    <svg {...baseProps(props)}>
+      <path d="M10 21h4M6 8a6 6 0 1 1 12 0c0 7 3 7 3 9H3c0-2 3-2 3-9" />
+    </svg>
+  )
+}
+
+export function AlertTriangleIcon(props: IconProps) {
+  return (
+    <svg {...baseProps(props)}>
+      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+      <path d="M12 9v4M12 17h.01" />
+    </svg>
+  )
+}
+
 export const losIcons = {
   shield: ShieldIcon,
   star: StarIcon,
@@ -89,6 +141,12 @@ export const losIcons = {
   compass: CompassIcon,
   mountain: MountainIcon,
   trophy: TrophyIcon,
+  gear: GearIcon,
+  settings: SettingsIcon,
+  user: UserIcon,
+  palette: PaletteIcon,
+  bell: BellIcon,
+  alertTriangle: AlertTriangleIcon,
 } as const
 
 export type LosIconName = keyof typeof losIcons

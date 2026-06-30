@@ -24,7 +24,7 @@ export default function Card({
   variant = 'default',
 }: CardProps) {
   return (
-    <Tag className={`rounded-xl border p-6 ${variantStyles[variant]} ${className}`}>
+    <Tag className={`rounded-xl border p-4 sm:p-6 ${variantStyles[variant]} ${className}`}>
       {children}
     </Tag>
   )

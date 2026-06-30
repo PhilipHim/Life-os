@@ -1,8 +1,8 @@
-import type { BusinessIdea, BusinessIdeaAnalysis } from '@/lib/types'
+import type { BusinessIdea, BusinessIdeaAnalysis } from '@/types'
 import type { BusinessAnalysisProvider, BusinessAnalysisReport } from '@/lib/business-coach/types'
 import { ruleBasedBusinessProvider } from '@/lib/business-coach/providers/rule-based'
 import { computeBusinessIdeasStats } from '@/lib/business-coach/stats'
-import { getBusinessIdeas, saveBusinessIdea } from '@/lib/db/business-ideas'
+import { getBusinessIdeas, saveBusinessIdea } from '@/database/business-ideas'
 
 let activeProvider: BusinessAnalysisProvider = ruleBasedBusinessProvider
 

@@ -11,6 +11,10 @@ import {
   countSleepDaysAboveScore,
   hasHealthLoggedOnDate,
   countWorkoutsInWeek,
+  countFocusMinutesOnDate,
+  countFocusMinutesInWeek,
+  countPlannerItemsOnDate,
+  countHabitSuccessDaysInWeek,
 } from '@/lib/challenges/progress'
 
 export interface ChallengeTemplate {
@@ -171,6 +175,64 @@ export const CHALLENGE_TEMPLATES: ChallengeTemplate[] = [
     },
     computeCurrent: (_t, _m, ctx) => countWorkoutsInWeek(ctx.weekDates),
   },
+  {
+    id: 'daily_focus',
+    module: 'focus',
+    period: 'daily',
+    title: (t) => `Focus for ${t} Minutes`,
+    description: (t) => `Log at least ${t} minutes of focus time today.`,
+    xpReward: (t) => 35 + t,
+    pickTarget: () => ({ target: 25, meta: {} }),
+    computeCurrent: (_t, _m, ctx) => countFocusMinutesOnDate(ctx.today),
+  },
+  {
+    id: 'daily_planner',
+    module: 'planner',
+    period: 'daily',
+    title: (t) => `Plan ${t} Task${t === 1 ? '' : 's'}`,
+    description: (t) => `Add ${t} task${t === 1 ? '' : 's'} to today's plan.`,
+    xpReward: (t) => 25 + t * 5,
+    pickTarget: () => ({ target: 1, meta: {} }),
+    computeCurrent: (_t, _m, ctx) => countPlannerItemsOnDate(ctx.today),
+  },
+  {
+    id: 'weekly_focus',
+    module: 'focus',
+    period: 'weekly',
+    title: (t) => `Log ${t} Focus Minutes`,
+    description: (t) => `Accumulate ${t} minutes of focus time this week.`,
+    xpReward: (t) => 80 + Math.round(t / 2),
+    pickTarget: (ctx) => {
+      if (!ctx.hasFocusHistory) return null
+      const target = clamp(120, 90, 240)
+      return { target, meta: {} }
+    },
+    computeCurrent: (_t, _m, ctx) => countFocusMinutesInWeek(ctx.weekDates),
+  },
+  {
+    id: 'weekly_habit_days',
+    module: 'habits',
+    period: 'weekly',
+    title: (t) => `Succeed on ${t} Habit Days`,
+    description: (t) => `Complete habits on ${t} different days this week.`,
+    xpReward: (t) => 55 + t * 8,
+    pickTarget: (ctx) => {
+      if (ctx.activeHabitCount === 0) return null
+      return { target: clamp(5, 3, 5), meta: {} }
+    },
+    computeCurrent: (_t, _m, ctx) => countHabitSuccessDaysInWeek(ctx.weekDates),
+  },
+  {
+    id: 'weekly_planner',
+    module: 'planner',
+    period: 'weekly',
+    title: (t) => `Plan ${t} Days`,
+    description: (t) => `Add tasks to your planner on ${t} days this week.`,
+    xpReward: (t) => 60 + t * 10,
+    pickTarget: () => ({ target: 4, meta: {} }),
+    computeCurrent: (_t, _m, ctx) =>
+      ctx.weekDates.filter((date) => countPlannerItemsOnDate(date) > 0).length,
+  },
 ]
 
 export const DAILY_TEMPLATES = CHALLENGE_TEMPLATES.filter((t) => t.period === 'daily')
@@ -182,4 +244,6 @@ export const MODULE_LABELS: Record<ChallengeModule, string> = {
   journal: 'Journal',
   sleep: 'Sleep',
   health: 'Health',
+  focus: 'Focus',
+  planner: 'Planner',
 }

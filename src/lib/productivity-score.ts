@@ -1,9 +1,9 @@
-import type { DailyPlanItem, WorkItem, FocusSession } from '@/lib/types'
+import type { DailyPlanItem, WorkItem, FocusSession } from '@/types'
 import {
   getRecurringTemplates,
   computeTodayRecurringPlannerStats,
   isRecurringWorkItemCompleted,
-} from '@/lib/recurring'
+} from '@/features/tasks/lib/recurring'
 
 const PRIORITY_WEIGHTS: Record<string, number> = { H1: 4, H2: 3, M: 2, L: 1 }
 

@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
-import { generateGeminiJSON, isGeminiConfigured } from '@/lib/ai/gemini-server'
+import { generateGeminiJSON, isGeminiConfigured } from '@/ai/gemini-server'
 import {
   MONTHLY_REVIEW_SYSTEM_PROMPT,
   buildMonthlyReviewUserPrompt,
-} from '@/lib/ai/monthly-review-prompt'
-import { normalizeMonthlyReview } from '@/lib/ai/validate-monthly-review'
+} from '@/ai/monthly-review-prompt'
+import { normalizeMonthlyReview } from '@/ai/validate-monthly-review'
 import { buildMonthlyReviewSnapshot } from '@/lib/monthly-review/build-snapshot'
 import type { MonthlyReviewSnapshot } from '@/lib/monthly-review/types'
 

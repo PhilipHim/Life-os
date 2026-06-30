@@ -3,8 +3,8 @@ import { buildCoachContext } from '@/lib/coach/context'
 import type { CoachReport } from '@/lib/coach/types'
 import type { CoachProvider } from '@/lib/coach/providers/types'
 import { ruleBasedCoachProvider } from '@/lib/coach/providers/rule-based'
-import { serializeCoachContextForAI } from '@/lib/ai/coach-prompt'
-import { mergeAICoachReport } from '@/lib/ai/validate-coach-response'
+import { serializeCoachContextForAI } from '@/ai/coach-prompt'
+import { mergeAICoachReport } from '@/ai/validate-coach-response'
 
 let activeProvider: CoachProvider = ruleBasedCoachProvider
 

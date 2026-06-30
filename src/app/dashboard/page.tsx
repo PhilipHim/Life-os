@@ -2,41 +2,44 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
-import { useWorkItems } from '@/lib/WorkItemContext'
-import { useFocus } from '@/lib/FocusContext'
-import { useDailyPlan } from '@/lib/DailyPlanContext'
+import { useWorkItems } from '@/contexts/WorkItemContext'
+import { useFocus } from '@/contexts/FocusContext'
+import { useDailyPlan } from '@/contexts/DailyPlanContext'
 import { computeProductivityScore, generateProductivityInsights } from '@/lib/productivity-score'
-import { useHabits } from '@/lib/HabitContext'
+import { useHabits } from '@/contexts/HabitContext'
 import { getInsights } from '@/lib/insights'
 import { getWeeklyReport, type WeeklyReport } from '@/lib/weekly'
 import { computeLifeScore } from '@/lib/life-score'
 import type { LifeScoreResult } from '@/lib/life-score'
-import { getSleepEntryByDate } from '@/lib/db/sleep'
-import { getHealthEntryByDate } from '@/lib/db/health'
-import { getHealthEvents, computeHealthStatus } from '@/lib/db/health-illness'
-import { getJournalEntryByDate } from '@/lib/db/journal'
+import { getSleepEntryByDate } from '@/database/sleep'
+import { getHealthEntryByDate } from '@/database/health'
+import { getHealthEvents, computeHealthStatus } from '@/database/health-illness'
+import { getJournalEntryByDate } from '@/database/journal'
 import { computeHealthScore } from '@/lib/health-score'
-import { getCharacterAreas } from '@/lib/db/character'
+import { getCharacterAreas } from '@/database/character'
 import {
   getAssets,
   getWatchlistAssets,
   computeAggregatedPerformance,
   computeStockPerformance,
-} from '@/lib/db/finance'
-import type { CharacterArea, JournalEntry } from '@/lib/types'
+} from '@/database/finance'
+import type { CharacterArea, JournalEntry } from '@/types'
 import { generateCoachReportAsync, type CoachReport } from '@/lib/coach'
 import Card from '@/components/ui/Card'
 import ProgressBar from '@/components/ui/ProgressBar'
-import AICoachCard from '@/components/coach/AICoachCard'
-import DashboardChallengesCard from '@/components/challenges/DashboardChallengesCard'
+import AICoachCard from '@/components/features/coach/AICoachCard'
+import DashboardChallengesCard from '@/components/features/challenges/DashboardChallengesCard'
+import WelcomeCard from '@/components/features/first-experience/WelcomeCard'
+import FirstMissionCard from '@/components/features/first-experience/FirstMissionCard'
+import { useFirstExperience } from '@/hooks/useFirstExperience'
 import {
   StrategicSection,
   ScoreHeroCard,
   KpiCard,
-} from '@/components/strategic'
+} from '@/components/features/strategic'
 import { CompassIcon, MountainIcon } from '@/design-system/icons'
 import { losClasses } from '@/design-system/tokens'
-import { orderPlanItems } from '@/lib/planner'
+import { orderPlanItems } from '@/features/planner/lib/planner'
 
 function todayLocal(): string {
   const d = new Date()
@@ -81,6 +84,55 @@ function formatPct(value: number): string {
   return `${sign}${value.toFixed(2)}%`
 }
 
+const EMPTY_LIFE_OS_SNAPSHOT = {
+  sleepScore: null as number | null,
+  healthScore: null as number | null,
+  daysWithoutIllness: 0,
+  isSick: false,
+  journalCompleted: false,
+  portfolioDailyPct: 0,
+  bestAsset: null as { symbol: string; pct: number } | null,
+  worstAsset: null as { symbol: string; pct: number } | null,
+  watchlistCount: 0,
+  portfolioCount: 0,
+}
+
+function buildLifeOsSnapshot(todayStr: string) {
+  const sleepEntry = getSleepEntryByDate(todayStr)
+  const healthEntry = getHealthEntryByDate(todayStr)
+  const journalEntry = getJournalEntryByDate(todayStr)
+  const healthStatus = computeHealthStatus(getHealthEvents(), todayStr)
+
+  const assets = getAssets()
+  const watchlist = getWatchlistAssets()
+  const portfolioPerf = computeAggregatedPerformance(assets)
+
+  let bestAsset: { symbol: string; pct: number } | null = null
+  let worstAsset: { symbol: string; pct: number } | null = null
+  for (const asset of assets) {
+    const { dailyChangePct } = computeStockPerformance(asset)
+    if (!bestAsset || dailyChangePct > bestAsset.pct) {
+      bestAsset = { symbol: asset.symbol, pct: dailyChangePct }
+    }
+    if (!worstAsset || dailyChangePct < worstAsset.pct) {
+      worstAsset = { symbol: asset.symbol, pct: dailyChangePct }
+    }
+  }
+
+  return {
+    sleepScore: sleepEntry?.sleepScore ?? null,
+    healthScore: healthEntry ? computeHealthScore(healthEntry).total : null,
+    daysWithoutIllness: healthStatus.status === 'healthy' ? healthStatus.streakDays : 0,
+    isSick: healthStatus.status === 'sick',
+    journalCompleted: isJournalCompletedToday(journalEntry),
+    portfolioDailyPct: portfolioPerf.dailyChangePct,
+    bestAsset,
+    worstAsset,
+    watchlistCount: watchlist.length,
+    portfolioCount: assets.length,
+  }
+}
+
 export default function DashboardPage() {
   const { workItems } = useWorkItems()
   const { focusSessions, activeSession } = useFocus()
@@ -91,14 +143,20 @@ export default function DashboardPage() {
   const [insights, setInsights] = useState<ReturnType<typeof getInsights>>([])
   const [weeklyReport, setWeeklyReport] = useState<WeeklyReport | null>(null)
   const [characterAreas, setCharacterAreas] = useState<CharacterArea[]>([])
+  const [lifeOsSnapshot, setLifeOsSnapshot] = useState(EMPTY_LIFE_OS_SNAPSHOT)
+  const [clientReady, setClientReady] = useState(false)
+  const { active: firstExperienceActive, state: firstExperienceState, refresh: refreshFirstExperience } =
+    useFirstExperience()
 
   const todayStr = todayLocal()
 
   useEffect(() => {
+    setClientReady(true)
     setInsights(getInsights())
     setWeeklyReport(getWeeklyReport())
     setCharacterAreas(getCharacterAreas())
-  }, [workItems, focusSessions, planItems])
+    setLifeOsSnapshot(buildLifeOsSnapshot(todayStr))
+  }, [todayStr, workItems, focusSessions, planItems])
 
   const habitStats = useMemo(() => ({
     completed: todayHabitsDone,
@@ -137,41 +195,7 @@ export default function DashboardPage() {
     return merged
   }, [todayInsights, insights])
 
-  const lifeOsSnapshot = useMemo(() => {
-    const sleepEntry = getSleepEntryByDate(todayStr)
-    const healthEntry = getHealthEntryByDate(todayStr)
-    const journalEntry = getJournalEntryByDate(todayStr)
-    const healthStatus = computeHealthStatus(getHealthEvents(), todayStr)
-
-    const assets = getAssets()
-    const watchlist = getWatchlistAssets()
-    const portfolioPerf = computeAggregatedPerformance(assets)
-
-    let bestAsset: { symbol: string; pct: number } | null = null
-    let worstAsset: { symbol: string; pct: number } | null = null
-    for (const asset of assets) {
-      const { dailyChangePct } = computeStockPerformance(asset)
-      if (!bestAsset || dailyChangePct > bestAsset.pct) {
-        bestAsset = { symbol: asset.symbol, pct: dailyChangePct }
-      }
-      if (!worstAsset || dailyChangePct < worstAsset.pct) {
-        worstAsset = { symbol: asset.symbol, pct: dailyChangePct }
-      }
-    }
-
-    return {
-      sleepScore: sleepEntry?.sleepScore ?? null,
-      healthScore: healthEntry ? computeHealthScore(healthEntry).total : null,
-      daysWithoutIllness: healthStatus.status === 'healthy' ? healthStatus.streakDays : 0,
-      isSick: healthStatus.status === 'sick',
-      journalCompleted: isJournalCompletedToday(journalEntry),
-      portfolioDailyPct: portfolioPerf.dailyChangePct,
-      bestAsset,
-      worstAsset,
-      watchlistCount: watchlist.length,
-      portfolioCount: assets.length,
-    }
-  }, [todayStr, workItems, focusSessions, planItems])
+  const lifeOsSnapshotForRender = clientReady ? lifeOsSnapshot : EMPTY_LIFE_OS_SNAPSHOT
 
   const habitRate = todayHabitsTotal > 0 ? Math.round((todayHabitsDone / todayHabitsTotal) * 100) : 0
 
@@ -275,7 +299,7 @@ export default function DashboardPage() {
   ])
 
   return (
-    <div className={`${losClasses.page} space-y-12`}>
+    <div className={`${losClasses.page} space-y-8 sm:space-y-12`}>
       <header className={losClasses.pageHeader}>
         <div className="flex items-center gap-3">
           <CompassIcon size={28} className="text-los-gold" />
@@ -285,6 +309,15 @@ export default function DashboardPage() {
           Your ASCEND overview — productivity, health, and daily progress at a glance
         </p>
       </header>
+
+      {clientReady && firstExperienceActive && (
+        <div className="space-y-4">
+          {!firstExperienceState.welcomeDismissed && (
+            <WelcomeCard onDismiss={refreshFirstExperience} />
+          )}
+          <FirstMissionCard objectives={firstExperienceState.objectives} />
+        </div>
+      )}
 
       <div className="grid gap-6 md:grid-cols-2">
         <ScoreHeroCard
@@ -336,40 +369,40 @@ export default function DashboardPage() {
       )}
 
       <StrategicSection title="Today Overview" subtitle="Daily health, wellness, and habit snapshot" href="/life-os" linkLabel="Open Life">
-        <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="grid gap-3 grid-cols-1 min-[400px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
           <KpiCard
             label="Sleep Score"
-            metric={lifeOsSnapshot.sleepScore != null ? String(lifeOsSnapshot.sleepScore) : '—'}
-            sublabel={lifeOsSnapshot.sleepScore != null ? 'Logged today' : 'Not logged'}
+            metric={lifeOsSnapshotForRender.sleepScore != null ? String(lifeOsSnapshotForRender.sleepScore) : '—'}
+            sublabel={lifeOsSnapshotForRender.sleepScore != null ? 'Logged today' : 'Not logged'}
             href="/life-os"
           />
           <KpiCard
             label="Health Score"
-            metric={lifeOsSnapshot.healthScore != null ? String(lifeOsSnapshot.healthScore) : '—'}
-            sublabel={lifeOsSnapshot.healthScore != null ? 'Logged today' : 'Not logged'}
+            metric={lifeOsSnapshotForRender.healthScore != null ? String(lifeOsSnapshotForRender.healthScore) : '—'}
+            sublabel={lifeOsSnapshotForRender.healthScore != null ? 'Logged today' : 'Not logged'}
             href="/life-os"
           />
           <KpiCard
             label="Days Without Illness"
-            metric={lifeOsSnapshot.isSick ? '0' : String(lifeOsSnapshot.daysWithoutIllness)}
-            sublabel={lifeOsSnapshot.isSick ? 'Currently sick' : 'Healthy streak'}
+            metric={lifeOsSnapshotForRender.isSick ? '0' : String(lifeOsSnapshotForRender.daysWithoutIllness)}
+            sublabel={lifeOsSnapshotForRender.isSick ? 'Currently sick' : 'Healthy streak'}
             href="/life-os"
-            highlight={!lifeOsSnapshot.isSick && lifeOsSnapshot.daysWithoutIllness > 0}
+            highlight={!lifeOsSnapshotForRender.isSick && lifeOsSnapshotForRender.daysWithoutIllness > 0}
           />
           <KpiCard
             label="Journal Today"
-            metric={lifeOsSnapshot.journalCompleted ? 'Done' : '—'}
-            sublabel={lifeOsSnapshot.journalCompleted ? 'Entry saved' : 'Not completed'}
+            metric={lifeOsSnapshotForRender.journalCompleted ? 'Done' : '—'}
+            sublabel={lifeOsSnapshotForRender.journalCompleted ? 'Entry saved' : 'Not completed'}
             href="/life-os"
-            highlight={lifeOsSnapshot.journalCompleted}
+            highlight={lifeOsSnapshotForRender.journalCompleted}
           />
           <KpiCard
             label="Habits Today"
-            metric={todayHabitsTotal > 0 ? `${habitRate}%` : '—'}
-            sublabel={todayHabitsTotal > 0 ? `${todayHabitsDone}/${todayHabitsTotal} done` : 'No habits'}
-            progress={habitRate}
+            metric={clientReady && todayHabitsTotal > 0 ? `${habitRate}%` : '—'}
+            sublabel={clientReady && todayHabitsTotal > 0 ? `${todayHabitsDone}/${todayHabitsTotal} done` : 'No habits'}
+            progress={clientReady ? habitRate : undefined}
             href="/habits/today"
-            highlight={habitRate >= 80}
+            highlight={clientReady && habitRate >= 80}
           />
         </div>
       </StrategicSection>
@@ -458,34 +491,34 @@ export default function DashboardPage() {
 
       <StrategicSection title="Finance Snapshot" subtitle="Portfolio performance today" href="/life-os" linkLabel="View portfolio">
         <Card>
-          {lifeOsSnapshot.portfolioCount === 0 ? (
+          {lifeOsSnapshotForRender.portfolioCount === 0 ? (
             <p className="text-sm text-los-text-muted text-center py-2">No portfolio assets — add stocks in Life</p>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div>
                 <p className="los-section-label">Portfolio Today</p>
-                <p className={`mt-2 text-2xl font-bold tabular-nums ${lifeOsSnapshot.portfolioDailyPct >= 0 ? 'text-los-success' : 'text-los-danger'}`}>
-                  {formatPct(lifeOsSnapshot.portfolioDailyPct)}
+                <p className={`mt-2 text-2xl font-bold tabular-nums ${lifeOsSnapshotForRender.portfolioDailyPct >= 0 ? 'text-los-success' : 'text-los-danger'}`}>
+                  {formatPct(lifeOsSnapshotForRender.portfolioDailyPct)}
                 </p>
               </div>
               <div>
                 <p className="los-section-label">Best Today</p>
-                <p className="mt-2 text-sm font-semibold text-los-text-primary">{lifeOsSnapshot.bestAsset?.symbol ?? '—'}</p>
-                {lifeOsSnapshot.bestAsset && (
-                  <p className="text-xs text-los-success tabular-nums">{formatPct(lifeOsSnapshot.bestAsset.pct)}</p>
+                <p className="mt-2 text-sm font-semibold text-los-text-primary">{lifeOsSnapshotForRender.bestAsset?.symbol ?? '—'}</p>
+                {lifeOsSnapshotForRender.bestAsset && (
+                  <p className="text-xs text-los-success tabular-nums">{formatPct(lifeOsSnapshotForRender.bestAsset.pct)}</p>
                 )}
               </div>
               <div>
                 <p className="los-section-label">Worst Today</p>
-                <p className="mt-2 text-sm font-semibold text-los-text-primary">{lifeOsSnapshot.worstAsset?.symbol ?? '—'}</p>
-                {lifeOsSnapshot.worstAsset && (
-                  <p className="text-xs text-los-danger tabular-nums">{formatPct(lifeOsSnapshot.worstAsset.pct)}</p>
+                <p className="mt-2 text-sm font-semibold text-los-text-primary">{lifeOsSnapshotForRender.worstAsset?.symbol ?? '—'}</p>
+                {lifeOsSnapshotForRender.worstAsset && (
+                  <p className="text-xs text-los-danger tabular-nums">{formatPct(lifeOsSnapshotForRender.worstAsset.pct)}</p>
                 )}
               </div>
               <div>
                 <p className="los-section-label">Watchlist</p>
-                <p className="mt-2 text-2xl font-bold text-los-text-primary tabular-nums">{lifeOsSnapshot.watchlistCount}</p>
-                <p className="text-xs text-los-text-muted">{lifeOsSnapshot.portfolioCount} in portfolio</p>
+                <p className="mt-2 text-2xl font-bold text-los-text-primary tabular-nums">{lifeOsSnapshotForRender.watchlistCount}</p>
+                <p className="text-xs text-los-text-muted">{lifeOsSnapshotForRender.portfolioCount} in portfolio</p>
               </div>
             </div>
           )}

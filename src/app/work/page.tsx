@@ -1,26 +1,29 @@
 'use client'
 
 import { useState, useMemo, useCallback, useEffect } from 'react'
-import type { WorkItem } from '@/lib/types'
-import { useWorkItems } from '@/lib/WorkItemContext'
+import type { WorkItem } from '@/types'
+import { useWorkItems } from '@/contexts/WorkItemContext'
 import {
   generateTodayInstances,
   toggleRecurringCompletion,
   skipRecurringToday,
   unskipRecurringToday,
   computeRecurringTemplateStats,
-} from '@/lib/recurring'
+} from '@/features/tasks/lib/recurring'
 import Card from '@/components/ui/Card'
-import Button from '@/components/ui/Button'
+import Button, { deleteButtonClass } from '@/components/ui/Button'
 import Checkbox from '@/components/ui/Checkbox'
-import DetailsPanel from '@/components/DetailsPanel'
-import AddToPlanFlow from '@/components/AddToPlanFlow'
-import { useDailyPlan } from '@/lib/DailyPlanContext'
+import DetailsPanel from '@/components/common/DetailsPanel'
+import AddToPlanFlow from '@/components/common/AddToPlanFlow'
+import EmptyState from '@/components/common/EmptyState'
+import PageHeader from '@/components/layout/PageHeader'
+import ContextualHint, { useContextualHint } from '@/components/features/first-experience/ContextualHint'
+import { markHintDismissed } from '@/database/first-experience'
+import { useDailyPlan } from '@/contexts/DailyPlanContext'
 
 type ViewMode = 'active' | 'completed' | 'all'
 
 const CHILD_PREVIEW_LIMIT = 3
-const DELETE_BTN = 'text-red-500 hover:text-red-600 hover:bg-red-50'
 
 function listEmptyMessage(viewFilter: ViewMode, searchQuery: string): string {
   if (searchQuery.trim()) return 'No tasks match your search.'
@@ -96,6 +99,8 @@ export default function WorkPage() {
     setRecurringRefreshKey((k) => k + 1)
   }, [])
 
+  const { dismissHint } = useContextualHint('tasks')
+
   const handleSingleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     const title = input.trim()
@@ -105,6 +110,8 @@ export default function WorkPage() {
       description: singleDescription.trim(),
       notes: singleDetails.trim(),
     })
+    dismissHint()
+    markHintDismissed('tasks')
     setInput('')
     setSingleDescription('')
     setSingleDetails('')
@@ -245,8 +252,13 @@ export default function WorkPage() {
   const listEmpty = listEmptyMessage(viewFilter, searchQuery)
 
   return (
-    <div className="space-y-10">
-      <h1 className="text-4xl font-bold tracking-tight">Tasks</h1>
+    <div className="los-page space-y-10">
+      <PageHeader
+        title="Tasks"
+        subtitle="Capture work, organize groups, and plan your day."
+      />
+
+      <ContextualHint section="tasks" message="Create one-time actions here." />
 
       <Card>
         <div className="flex gap-1 mb-6">
@@ -269,25 +281,26 @@ export default function WorkPage() {
         {mode === 'single' ? (
           <form onSubmit={handleSingleSubmit} className="space-y-4">
             <input
+              id="ascend-task-input"
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Title..."
-              className="min-h-[44px] w-full rounded-lg border border-gray-300 bg-white px-4 text-sm placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-1"
+              className="los-input min-h-[44px] w-full"
             />
             <textarea
               value={singleDescription}
               onChange={(e) => setSingleDescription(e.target.value)}
               placeholder="Description (optional)..."
               rows={2}
-              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-1"
+              className="los-textarea w-full"
             />
             <textarea
               value={singleDetails}
               onChange={(e) => setSingleDetails(e.target.value)}
               placeholder="Details (optional)..."
               rows={2}
-              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-1"
+              className="los-textarea w-full"
             />
             <Button type="submit">Add Task</Button>
           </form>
@@ -298,17 +311,17 @@ export default function WorkPage() {
               value={groupTitle}
               onChange={(e) => setGroupTitle(e.target.value)}
               placeholder="Group title..."
-              className="min-h-[44px] w-full rounded-lg border border-gray-300 bg-white px-4 text-sm placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-1"
+              className="los-input min-h-[44px] w-full"
             />
             <textarea
               value={groupDescription}
               onChange={(e) => setGroupDescription(e.target.value)}
               placeholder="Description (optional)..."
               rows={2}
-              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-1"
+              className="los-textarea w-full"
             />
             <div className="space-y-3">
-              <p className="text-xs font-medium uppercase tracking-widest text-gray-400">Create New Tasks</p>
+              <p className="los-section-label">Create New Tasks</p>
               {taskRows.map((row, idx) => (
                 <div key={row.id} className="flex items-start gap-2">
                   <input
@@ -320,7 +333,7 @@ export default function WorkPage() {
                       setTaskRows(next)
                     }}
                     placeholder="Task title..."
-                    className="min-h-[36px] flex-1 rounded-lg border border-gray-300 bg-white px-3 text-sm placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-1"
+                    className="los-input min-h-[36px] flex-1"
                   />
                   <input
                     type="text"
@@ -331,13 +344,13 @@ export default function WorkPage() {
                       setTaskRows(next)
                     }}
                     placeholder="Description (optional)"
-                    className="min-h-[36px] hidden sm:block w-48 rounded-lg border border-gray-300 bg-white px-3 text-sm placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-1"
+                    className="los-input min-h-[36px] hidden sm:block w-48"
                   />
                   {taskRows.length > 1 && (
                     <button
                       type="button"
                       onClick={() => removeTaskRow(row.id)}
-                      className="text-gray-400 hover:text-red-500 transition-colors p-1.5"
+                      className="text-los-text-muted hover:text-red-500 transition-colors p-1.5"
                     >
                       <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -349,17 +362,17 @@ export default function WorkPage() {
               <button
                 type="button"
                 onClick={addTaskRow}
-                className="text-xs text-gray-500 hover:text-gray-900 transition-colors"
+                className="text-xs text-los-text-secondary hover:text-los-text-primary transition-colors"
               >
                 + Add another task
               </button>
             </div>
 
-            <div className="space-y-3 border-t border-gray-100 pt-4">
+            <div className="space-y-3 border-t border-los-border-subtle pt-4">
               <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-medium uppercase tracking-widest text-gray-400">Select Existing Tasks</p>
+                <p className="los-section-label">Select Existing Tasks</p>
                 {selectedExistingIds.size > 0 && (
-                  <span className="text-xs text-gray-500">{selectedExistingIds.size} selected</span>
+                  <span className="text-xs text-los-text-secondary">{selectedExistingIds.size} selected</span>
                 )}
               </div>
               <input
@@ -367,24 +380,24 @@ export default function WorkPage() {
                 value={groupExistingSearch}
                 onChange={(e) => setGroupExistingSearch(e.target.value)}
                 placeholder="Search active tasks..."
-                className="min-h-[36px] w-full rounded-lg border border-gray-300 bg-white px-3 text-sm placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-1"
+                className="los-input min-h-[36px] w-full"
               />
-              <div className="max-h-48 overflow-y-auto rounded-lg border border-gray-200 divide-y divide-gray-100">
+              <div className="max-h-48 overflow-y-auto rounded-lg border border-los-border divide-y divide-los-border-subtle">
                 {selectableForGroup.length === 0 && (
-                  <p className="px-3 py-4 text-center text-xs text-gray-400">No active unassigned tasks found.</p>
+                  <p className="px-3 py-4 text-center text-xs text-los-text-muted">No active unassigned tasks found.</p>
                 )}
                 {selectableForGroup.map((task) => (
                   <label
                     key={task.id}
-                    className="flex cursor-pointer items-center gap-3 px-3 py-2.5 hover:bg-gray-50 transition-colors"
+                    className="flex cursor-pointer items-center gap-3 px-3 py-2.5 hover:bg-los-bg-secondary transition-colors"
                   >
                     <input
                       type="checkbox"
                       checked={selectedExistingIds.has(task.id)}
                       onChange={() => toggleGroupExistingSelection(task.id)}
-                      className="size-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
+                      className="size-4 rounded border-los-border text-los-text-primary focus:ring-los-gold/50"
                     />
-                    <span className="text-sm text-gray-900">{task.title}</span>
+                    <span className="text-sm text-los-text-primary">{task.title}</span>
                   </label>
                 ))}
               </div>
@@ -395,45 +408,40 @@ export default function WorkPage() {
         )}
       </Card>
 
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-1">
           {(['active', 'completed', 'all'] as const).map((f) => (
             <button
               key={f}
+              type="button"
               onClick={() => setViewFilter(f)}
               className={
-                viewFilter === f
-                  ? 'rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white shadow-sm'
-                  : 'rounded-lg px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-900'
+                viewFilter === f ? 'los-filter-pill los-filter-pill--active' : 'los-filter-pill'
               }
             >
               {f === 'active' ? 'Open Tasks' : f === 'completed' ? 'Completed Tasks' : 'All Tasks'}
             </button>
           ))}
           {viewFilter === 'completed' && completedCount > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleDeleteAllCompleted}
-              className="text-red-500 hover:text-red-600 hover:bg-red-50"
-            >
+            <Button variant="dangerGhost" size="sm" onClick={handleDeleteAllCompleted}>
               Delete All Completed
             </Button>
           )}
         </div>
         <input
-          type="text"
+          type="search"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search..."
-          className="min-h-[40px] max-w-xs rounded-lg border border-gray-300 bg-white px-4 text-sm placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-1"
+          className="los-input w-full sm:max-w-xs"
+          aria-label="Search tasks"
         />
       </div>
 
       <div className="space-y-8">
         {todayRecurringInstances.length > 0 && (
           <div className="space-y-3">
-            <p className="text-xs font-medium uppercase tracking-widest text-gray-400">Today&apos;s Recurring</p>
+            <p className="los-section-label">Today&apos;s Recurring</p>
             {todayRecurringInstances
               .filter((i) => i.title.toLowerCase().includes(searchQuery.toLowerCase()))
               .map((item) => {
@@ -443,8 +451,8 @@ export default function WorkPage() {
               const isSkipped = item.instanceStatus === 'skipped'
               const isDone = item.instanceStatus === 'completed'
               return (
-              <Card key={item.id} className={`transition-all hover:border-gray-300 hover:shadow-md ${isSkipped ? 'opacity-60' : ''}`}>
-                <div className="flex items-center gap-4">
+              <Card key={item.id} variant="interactive" className={isSkipped ? 'opacity-60' : ''}>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
                   <Checkbox
                     checked={isDone}
                     disabled={isSkipped}
@@ -456,29 +464,29 @@ export default function WorkPage() {
                         {item.recurrenceType === 'weekly' ? 'Weekly' : 'Daily'}
                       </span>
                       {isSkipped && (
-                        <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">Skipped</span>
+                        <span className="shrink-0 rounded bg-los-bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-los-text-secondary">Skipped</span>
                       )}
-                      <p className={`text-sm ${isDone ? 'text-gray-400 line-through' : isSkipped ? 'text-gray-400' : 'text-gray-900'}`}>
+                      <p className={`text-sm ${isDone ? 'text-los-text-muted line-through' : isSkipped ? 'text-los-text-muted' : 'text-los-text-primary'}`}>
                         {item.title}
                       </p>
                     </div>
                     {item.description && (
-                      <p className="text-xs text-gray-400 mt-0.5">{item.description}</p>
+                      <p className="text-xs text-los-text-muted mt-0.5">{item.description}</p>
                     )}
-                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
+                    <div className="flex items-center gap-3 mt-1 text-xs text-los-text-muted">
                       <span>{stats.streak} day streak</span>
                       <span>·</span>
                       <span>{stats.weeklyCompletionPct}% this week</span>
                     </div>
                   </div>
-                  <div className="flex gap-1">
+                  <div className="flex flex-wrap gap-1 shrink-0">
                     <Button variant="ghost" size="sm" onClick={() => setPlanTargetItem({ id: item.templateId, title: item.title })} className={plannedIds.has(item.templateId) ? 'text-green-600' : ''}>Plan</Button>
                     {isSkipped ? (
                       <Button variant="ghost" size="sm" onClick={() => handleUnskipRecurringInstance(item.templateId)}>Undo Skip</Button>
                     ) : (
                       <Button variant="ghost" size="sm" onClick={() => handleSkipRecurringInstance(item.templateId)}>Skip</Button>
                     )}
-                    <Button variant="ghost" size="sm" onClick={() => deleteRecurringTemplate(item.templateId)} className={DELETE_BTN}>Delete</Button>
+                    <Button variant="ghost" size="sm" onClick={() => deleteRecurringTemplate(item.templateId)} className={deleteButtonClass}>Delete</Button>
                   </div>
                 </div>
               </Card>
@@ -486,32 +494,43 @@ export default function WorkPage() {
           </div>
         )}
 
-        {showListEmpty && (
-          <Card><p className="text-center text-sm text-gray-400 py-6">{listEmpty}</p></Card>
-        )}
+        {showListEmpty &&
+          (viewFilter === 'active' && !searchQuery.trim() ? (
+            <EmptyState
+              title="Your task list is waiting"
+              action={{
+                label: 'Create your first task',
+                onClick: () => document.getElementById('ascend-task-input')?.focus(),
+              }}
+            >
+              You haven&apos;t created any tasks yet. Let&apos;s create your first one.
+            </EmptyState>
+          ) : (
+            <EmptyState>{listEmpty}</EmptyState>
+          ))}
 
         {standaloneItems.length > 0 && (
           <div className="space-y-3">
-            <p className="text-xs font-medium uppercase tracking-widest text-gray-400">Tasks</p>
+            <p className="los-section-label">Tasks</p>
             {standaloneItems.map((item) => (
-              <Card key={item.id} className="transition-all hover:border-gray-300 hover:shadow-md">
-                <div className="flex items-center gap-4">
+              <Card key={item.id} variant="interactive">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
                   <Checkbox
                     checked={item.status === 'completed'}
                     onChange={() => toggleWorkItem(item.id)}
                   />
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm ${item.status === 'completed' ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
+                    <p className={`text-sm ${item.status === 'completed' ? 'text-los-text-muted line-through' : 'text-los-text-primary'}`}>
                       {item.title}
                     </p>
                     {item.description && (
-                      <p className="text-xs text-gray-400 mt-0.5">{item.description}</p>
+                      <p className="text-xs text-los-text-muted mt-0.5">{item.description}</p>
                     )}
                   </div>
-                  <div className="flex gap-1">
+                  <div className="flex flex-wrap gap-1 shrink-0">
                     <Button variant="ghost" size="sm" onClick={() => setPanelItem(item)}>Details</Button>
                     <Button variant="ghost" size="sm" onClick={() => setPlanTargetItem({ id: item.id, title: item.title })} className={plannedIds.has(item.id) ? 'text-green-600' : ''}>Plan</Button>
-                    <Button variant="ghost" size="sm" onClick={() => deleteWorkItem(item.id)} className={DELETE_BTN}>Delete</Button>
+                    <Button variant="ghost" size="sm" onClick={() => deleteWorkItem(item.id)} className={deleteButtonClass}>Delete</Button>
                   </div>
                 </div>
               </Card>
@@ -521,7 +540,7 @@ export default function WorkPage() {
 
         {groupItemsList.length > 0 && (
           <div className="space-y-3">
-            <p className="text-xs font-medium uppercase tracking-widest text-gray-400">Groups</p>
+            <p className="los-section-label">Groups</p>
             {groupItemsList.map((item) => {
               const children = getChildren(item.id)
               const doneChildren = children.filter((c) => c.status === 'completed').length
@@ -531,7 +550,7 @@ export default function WorkPage() {
 
               return (
                 <div key={item.id} className="space-y-2">
-                  <Card className="transition-all hover:border-gray-300 hover:shadow-md">
+                  <Card variant="interactive">
                     <div className="flex items-start gap-4">
                       <Checkbox
                         checked={item.status === 'completed'}
@@ -543,13 +562,13 @@ export default function WorkPage() {
                             <span className="rounded bg-purple-50 px-1.5 py-0.5 text-[10px] font-medium text-purple-600">
                               GROUP
                             </span>
-                            <p className={item.status === 'completed' ? 'font-semibold text-gray-400 line-through' : 'font-semibold text-gray-900'}>
+                            <p className={item.status === 'completed' ? 'font-semibold text-los-text-muted line-through' : 'font-semibold text-los-text-primary'}>
                               {item.title}
                             </p>
                           </div>
                           <button
                             onClick={() => toggleGroup(item.id)}
-                            className="text-gray-400 hover:text-gray-700 transition-colors"
+                            className="text-los-text-muted hover:text-los-text-primary transition-colors"
                           >
                             <svg
                               className={`size-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
@@ -562,42 +581,42 @@ export default function WorkPage() {
                         {previewLines.length > 0 && (
                           <ul className="mt-1.5 space-y-0.5">
                             {previewLines.map((line, idx) => (
-                              <li key={idx} className="text-xs text-gray-500 truncate pl-0.5">
-                                <span className="text-gray-400 mr-1.5">•</span>
+                              <li key={idx} className="text-xs text-los-text-secondary truncate pl-0.5">
+                                <span className="text-los-text-muted mr-1.5">•</span>
                                 {line}
                               </li>
                             ))}
                           </ul>
                         )}
                         {item.description && (
-                          <p className="text-sm text-gray-500 mt-1">{item.description}</p>
+                          <p className="text-sm text-los-text-secondary mt-1">{item.description}</p>
                         )}
                         <div className="flex items-center gap-3 mt-2">
-                          <div className="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                          <div className="flex-1 h-1.5 rounded-full bg-los-bg-secondary overflow-hidden">
                             <div
-                              className="h-full rounded-full bg-gray-900 transition-all"
+                              className="h-full rounded-full los-progress-gold transition-all"
                               style={{ width: `${progress}%` }}
                             />
                           </div>
-                          <span className="text-xs text-gray-400">{doneChildren}/{children.length}</span>
+                          <span className="text-xs text-los-text-muted">{doneChildren}/{children.length}</span>
                         </div>
                         <div className="flex gap-2 mt-2">
                           <Button variant="ghost" size="sm" onClick={() => setPanelItem(item)}>Details</Button>
                           <Button variant="ghost" size="sm" onClick={() => setPlanTargetItem({ id: item.id, title: item.title })} className={plannedIds.has(item.id) ? 'text-green-600' : ''}>Plan</Button>
-                          <Button variant="ghost" size="sm" onClick={() => deleteWorkItem(item.id)} className={DELETE_BTN}>Delete</Button>
+                          <Button variant="ghost" size="sm" onClick={() => deleteWorkItem(item.id)} className={deleteButtonClass}>Delete</Button>
                         </div>
                       </div>
                     </div>
                   </Card>
 
                   {isExpanded && (
-                    <div className="ml-8 space-y-2 pl-4 border-l-2 border-gray-100">
-                      <p className="text-xs font-medium uppercase tracking-widest text-gray-400">
+                    <div className="ml-4 space-y-2 border-l-2 border-los-border-subtle pl-3 sm:ml-8 sm:pl-4">
+                      <p className="los-section-label">
                         Tasks in group
                       </p>
 
                       {children.length === 0 && (
-                        <p className="text-xs text-gray-400 py-1">No tasks in this group yet.</p>
+                        <p className="text-xs text-los-text-muted py-1">No tasks in this group yet.</p>
                       )}
 
                       {children.map((child) => (
@@ -607,10 +626,10 @@ export default function WorkPage() {
                               checked={child.status === 'completed'}
                               onChange={() => toggleWorkItem(child.id)}
                             />
-                            <span className={`flex-1 text-sm ${child.status === 'completed' ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
+                            <span className={`flex-1 text-sm ${child.status === 'completed' ? 'text-los-text-muted line-through' : 'text-los-text-primary'}`}>
                               {child.title}
                             </span>
-                            <div className="flex gap-1">
+                            <div className="flex flex-wrap gap-1 shrink-0">
                               <Button variant="ghost" size="sm" onClick={() => setPanelItem(child)}>Details</Button>
                               <Button variant="ghost" size="sm" onClick={() => setPlanTargetItem({ id: child.id, title: child.title })} className={plannedIds.has(child.id) ? 'text-green-600' : ''}>Plan</Button>
                               <Button
@@ -637,7 +656,7 @@ export default function WorkPage() {
                               handleAddChild(item.id)
                             }
                           }}
-                          className="min-h-[36px] flex-1 rounded-lg border border-gray-300 bg-white px-3 text-sm placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-1"
+                          className="los-input min-h-[36px] flex-1"
                         />
                         <Button size="sm" onClick={() => handleAddChild(item.id)}>Add</Button>
                       </div>
@@ -652,7 +671,7 @@ export default function WorkPage() {
                               setExistingSearches((prev) => ({ ...prev, [item.id]: '' }))
                             }
                           }}
-                          className="text-xs text-gray-500 hover:text-gray-900 transition-colors"
+                          className="text-xs text-los-text-secondary hover:text-los-text-primary transition-colors"
                         >
                           {addingExistingTo === item.id ? 'Cancel' : '+ Add existing task'}
                         </button>
@@ -664,15 +683,15 @@ export default function WorkPage() {
                               value={getExistingSearch(item.id)}
                               onChange={(e) => setExistingSearches((prev) => ({ ...prev, [item.id]: e.target.value }))}
                               placeholder="Search active tasks..."
-                              className="min-h-[36px] w-full rounded-lg border border-gray-300 bg-white px-3 text-sm placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-1"
+                              className="los-input min-h-[36px] w-full"
                             />
                             <div className="max-h-48 overflow-y-auto space-y-1">
                               {filteredExistingForGroup(item.id).length === 0 && (
-                                <p className="text-xs text-gray-400 py-2">No active unassigned tasks found.</p>
+                                <p className="text-xs text-los-text-muted py-2">No active unassigned tasks found.</p>
                               )}
                               {filteredExistingForGroup(item.id).map((s) => (
-                                <div key={s.id} className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-gray-50">
-                                  <span className="text-sm text-gray-900">{s.title}</span>
+                                <div key={s.id} className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-los-bg-secondary">
+                                  <span className="text-sm text-los-text-primary">{s.title}</span>
                                   <Button
                                     size="sm"
                                     variant="secondary"
@@ -703,7 +722,7 @@ export default function WorkPage() {
           <div className="flex items-center justify-between mb-4">
             <button
               onClick={() => setShowDeleted((prev) => !prev)}
-              className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-700 transition-colors"
+              className="flex items-center gap-2 text-sm text-los-text-muted hover:text-los-text-primary transition-colors"
             >
               <span className="font-medium">Deleted Tasks ({deletedItems.length})</span>
               <svg
@@ -733,11 +752,11 @@ export default function WorkPage() {
                       {item.type === 'group' && (
                         <span className="rounded bg-purple-50 px-1.5 py-0.5 text-[10px] font-medium text-purple-600">GROUP</span>
                       )}
-                      <p className="text-sm text-gray-500 line-through">{item.title}</p>
+                      <p className="text-sm text-los-text-secondary line-through">{item.title}</p>
                     </div>
                     <div className="flex gap-2">
                       <Button variant="secondary" size="sm" onClick={() => restoreWorkItem(item.id)}>Restore</Button>
-                      <Button variant="ghost" size="sm" onClick={() => permanentDeleteWorkItem(item.id)} className={DELETE_BTN}>Delete Permanently</Button>
+                      <Button variant="ghost" size="sm" onClick={() => permanentDeleteWorkItem(item.id)} className={deleteButtonClass}>Delete Permanently</Button>
                     </div>
                   </div>
                 </Card>

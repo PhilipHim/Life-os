@@ -1,12 +1,13 @@
 import { getDailyStats } from '@/lib/analytics'
 import { computeLifeScore } from '@/lib/life-score'
-import { getWorkItems } from '@/lib/db/work-items'
-import { getTasks } from '@/lib/db/tasks'
-import { getHabits } from '@/lib/db/habits'
-import { getEntries as getHabitEntries } from '@/lib/db/habit-entries'
-import { getJournalEntries } from '@/lib/db/journal'
-import { getHealthEvents, computeHealthStatus, daysBetween } from '@/lib/db/health-illness'
+import { getWorkItems } from '@/database/work-items'
+import { getTasks } from '@/database/tasks'
+import { getHabits } from '@/database/habits'
+import { getEntries as getHabitEntries } from '@/database/habit-entries'
+import { getJournalEntries } from '@/database/journal'
+import { getHealthEvents, computeHealthStatus, daysBetween } from '@/database/health-illness'
 import { getAllSessions } from '@/lib/focus'
+import { getRoutineTemplates } from '@/database/routine-templates'
 import type { ProfileStats } from '@/lib/profile/types'
 
 function dateStr(d: Date): string {
@@ -158,6 +159,14 @@ function avgProductivityScore30d(): number | null {
   return Math.round((values.reduce((s, v) => s + v, 0) / values.length) * 10) / 10
 }
 
+function computeFocusStats(): { sessions: number; minutes: number } {
+  const sessions = getAllSessions().filter((s) => s.duration > 0)
+  return {
+    sessions: sessions.length,
+    minutes: Math.round(sessions.reduce((sum, s) => sum + s.duration, 0) / 60000),
+  }
+}
+
 export function computeProfileStats(): ProfileStats {
   const habitEntries = getHabitEntries()
   const journalEntries = getJournalEntries()
@@ -166,6 +175,7 @@ export function computeProfileStats(): ProfileStats {
   const healthStatus = computeHealthStatus(healthEvents, today)
   const longestHabit = computeLongestHabitStreak()
   const longestWellnessStreak = computeLongestWellnessStreak(healthEvents, today)
+  const focusStats = computeFocusStats()
 
   return {
     tasksCompleted: countTasksCompleted(),
@@ -173,6 +183,9 @@ export function computeProfileStats(): ProfileStats {
     journalEntries: journalEntries.length,
     daysWithoutSickness: healthStatus.status === 'healthy' ? healthStatus.streakDays : 0,
     longestWellnessStreak,
+    focusSessions: focusStats.sessions,
+    focusMinutes: focusStats.minutes,
+    routinesCreated: getRoutineTemplates().length,
     currentStreaks: {
       habit: streakFromDates([...new Set(habitEntries.map((e) => e.date))]),
       journal: streakFromDates([...new Set(journalEntries.map((j) => j.date))]),

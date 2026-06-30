@@ -1,5 +1,0 @@
-export { StrategicSection, StrategicSubheading } from '@/components/strategic/StrategicSection'
-export { default as ScoreHeroCard } from '@/components/strategic/ScoreHeroCard'
-export { default as KpiCard } from '@/components/strategic/KpiCard'
-export { default as DayTrendCard } from '@/components/strategic/DayTrendCard'
-export { default as AISurface, AIBadge, AIRecommendation } from '@/components/strategic/AISurface'

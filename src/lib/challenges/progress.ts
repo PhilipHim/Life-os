@@ -1,10 +1,12 @@
-import { getTasks } from '@/lib/db/tasks'
-import { getWorkItems } from '@/lib/db/work-items'
-import { getHabits } from '@/lib/db/habits'
-import { getEntries as getHabitEntries } from '@/lib/db/habit-entries'
-import { getJournalEntries } from '@/lib/db/journal'
-import { getSleepEntries } from '@/lib/db/sleep'
-import { getHealthEntries } from '@/lib/db/health'
+import { getTasks } from '@/database/tasks'
+import { getWorkItems } from '@/database/work-items'
+import { getHabits } from '@/database/habits'
+import { getEntries as getHabitEntries } from '@/database/habit-entries'
+import { getJournalEntries } from '@/database/journal'
+import { getSleepEntries } from '@/database/sleep'
+import { getHealthEntries } from '@/database/health'
+import { getDailyPlanItems } from '@/database/daily-plan'
+import { getAllSessions } from '@/lib/focus'
 import type { ProgressContext } from '@/lib/challenges/types'
 
 function dateFromTimestamp(ts: number): string {
@@ -78,6 +80,26 @@ export function countWorkoutsInWeek(weekDates: string[]): number {
   return getHealthEntries().filter(
     (e) => weekDates.includes(e.date) && (e.workoutMinutes ?? 0) > 0
   ).length
+}
+
+export function countFocusMinutesOnDate(date: string): number {
+  return Math.round(
+    getAllSessions()
+      .filter((s) => s.date === date && s.duration > 0)
+      .reduce((sum, s) => sum + s.duration, 0) / 60000
+  )
+}
+
+export function countFocusMinutesInWeek(weekDates: string[]): number {
+  return weekDates.reduce((sum, date) => sum + countFocusMinutesOnDate(date), 0)
+}
+
+export function countPlannerItemsOnDate(date: string): number {
+  return getDailyPlanItems().filter((item) => item.date === date).length
+}
+
+export function countHabitSuccessDaysInWeek(weekDates: string[]): number {
+  return weekDates.filter((date) => countHabitSuccessesOnDate(date) > 0).length
 }
 
 export function estimateAvgDailyTasks(): number {

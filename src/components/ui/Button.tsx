@@ -2,7 +2,7 @@
 
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'ai' | 'gold'
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'dangerGhost' | 'ai' | 'gold'
 type Size = 'sm' | 'md' | 'lg'
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -19,15 +19,20 @@ const variantStyles: Record<Variant, string> = {
   secondary:
     'bg-los-bg-card text-los-text-primary border border-los-border hover:border-los-border-gold hover:bg-los-bg-secondary shadow-los-card',
   ghost: 'text-los-text-secondary hover:text-los-text-primary hover:bg-los-bg-secondary',
+  dangerGhost:
+    'text-los-danger hover:text-red-400 hover:bg-los-danger/10 focus:ring-los-danger/50',
   ai: 'bg-los-ai text-white hover:bg-los-ai-light shadow-los-card focus:ring-los-ai/50',
   danger: 'bg-los-danger text-white hover:bg-red-500 shadow-los-card focus:ring-los-danger/50',
 }
 
 const sizeStyles: Record<Size, string> = {
-  sm: 'min-h-[36px] px-3 py-1.5 text-xs',
+  sm: 'min-h-[44px] px-3 py-1.5 text-xs sm:min-h-[36px]',
   md: 'min-h-[44px] px-5 py-2.5 text-sm',
   lg: 'min-h-[52px] px-7 py-3 text-base',
 }
+
+export const deleteButtonClass =
+  'text-los-danger hover:text-red-400 hover:bg-los-danger/10'
 
 export default function Button({
   variant = 'primary',

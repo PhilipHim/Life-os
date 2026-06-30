@@ -1,26 +1,28 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import type { JournalEntry, SleepEntry, HealthEntry, HealthEvent, Asset, BusinessIdea, Quote, CharacterArea } from '@/lib/types'
-import { getJournalEntries, saveJournalEntry } from '@/lib/db/journal'
-import { getSleepEntries, saveSleepEntry, calculateSleepScore, getSleepRating } from '@/lib/db/sleep'
+import type { JournalEntry, SleepEntry, HealthEntry, HealthEvent, Asset, BusinessIdea, Quote, CharacterArea } from '@/types'
+import { getJournalEntries, saveJournalEntry } from '@/database/journal'
+import { getSleepEntries, saveSleepEntry, calculateSleepScore, getSleepRating } from '@/database/sleep'
 import { calculateWakeOptions, formatDuration } from '@/lib/sleep-optimizer'
 import type { WakeTimeResult } from '@/lib/sleep-optimizer'
-import { getSleepPlanByDate, saveSleepPlan, deleteSleepPlan } from '@/lib/db/sleep-planner'
-import type { SleepPlan } from '@/lib/db/sleep-planner'
-import { getHealthEntries, saveHealthEntry } from '@/lib/db/health'
-import { getHealthEvents, saveHealthEvent, deleteHealthEvent, computeHealthStatus, daysBetween } from '@/lib/db/health-illness'
+import { getSleepPlanByDate, saveSleepPlan, deleteSleepPlan } from '@/database/sleep-planner'
+import type { SleepPlan } from '@/database/sleep-planner'
+import { getHealthEntries, saveHealthEntry } from '@/database/health'
+import { getHealthEvents, saveHealthEvent, deleteHealthEvent, computeHealthStatus, daysBetween } from '@/database/health-illness'
 import { computeHealthScore, getHealthRating } from '@/lib/health-score'
-import { getAssets, addStock, deleteAsset, computeAggregatedPerformance, computeStockPerformance, getMockPrice, searchStocks, addWatchlistStock, getWatchlistAssets, deleteWatchlistAsset } from '@/lib/db/finance'
-import { getBusinessIdeas, saveBusinessIdea, deleteBusinessIdea, IDEA_CATEGORIES } from '@/lib/db/business-ideas'
+import { getAssets, addStock, deleteAsset, computeAggregatedPerformance, computeStockPerformance, getMockPrice, searchStocks, addWatchlistStock, getWatchlistAssets, deleteWatchlistAsset } from '@/database/finance'
+import { getBusinessIdeas, saveBusinessIdea, deleteBusinessIdea, IDEA_CATEGORIES } from '@/database/business-ideas'
 import { analyzeAndSaveIdeaAsync, computeBusinessIdeasStats } from '@/lib/business-coach'
-import BusinessIdeasDashboard from '@/components/business/BusinessIdeasDashboard'
-import BusinessIdeaAnalysisPanel from '@/components/business/BusinessIdeaAnalysisPanel'
-import ConvertAnalysisToProjectModal from '@/components/business/ConvertAnalysisToProjectModal'
-import { getQuotes, saveQuote, deleteQuote } from '@/lib/db/quotes'
-import { getCharacterAreas, getAllCharacterAreas, setCharacterLevel, updateCharacterArea, deleteCharacterArea, restoreCharacterArea, permanentDeleteCharacterArea, saveCharacterArea } from '@/lib/db/character'
+import BusinessIdeasDashboard from '@/components/features/business/BusinessIdeasDashboard'
+import BusinessIdeaAnalysisPanel from '@/components/features/business/BusinessIdeaAnalysisPanel'
+import ConvertAnalysisToProjectModal from '@/components/features/business/ConvertAnalysisToProjectModal'
+import { getQuotes, saveQuote, deleteQuote } from '@/database/quotes'
+import { getCharacterAreas, getAllCharacterAreas, setCharacterLevel, updateCharacterArea, deleteCharacterArea, restoreCharacterArea, permanentDeleteCharacterArea, saveCharacterArea } from '@/database/character'
 import Card from '@/components/ui/Card'
-import ConvertIdeaToWorkModal from '@/components/ConvertIdeaToWorkModal'
+import ConvertIdeaToWorkModal from '@/components/common/ConvertIdeaToWorkModal'
+import WarningBanner from '@/components/common/WarningBanner'
+import PageHeader from '@/components/layout/PageHeader'
 
 type Tab = 'journal' | 'sleep' | 'health' | 'finance' | 'ideas' | 'quotes' | 'character'
 
@@ -107,7 +109,7 @@ function MoodSlider({
         <span className="text-xs text-gray-400 w-6 text-right">1</span>
         <input type="range" min={1} max={10} value={value}
           onChange={(e) => onChange(Number(e.target.value))}
-          className="flex-1 h-1.5 rounded-full appearance-none bg-gray-200 accent-gray-900 cursor-pointer" />
+          className="flex-1 h-3 cursor-pointer appearance-none rounded-full bg-gray-200 accent-gray-900 sm:h-1.5" />
         <span className="text-xs text-gray-400 w-6">10</span>
         <span className="text-lg font-bold text-gray-900 w-6 text-center tabular-nums">{value}</span>
       </div>
@@ -134,18 +136,30 @@ export default function LifeOsPage() {
   const [tab, setTab] = useState<Tab>('journal')
 
   return (
-    <div className="space-y-8">
-      <h1 className="text-4xl font-bold tracking-tight">Life</h1>
-      <p className="text-sm text-gray-500">Journal, health, sleep, finance, and character development</p>
+    <div className="los-page overflow-x-clip">
+      <PageHeader
+        title="Life"
+        subtitle="Journal, health, sleep, finance, and character development"
+      />
 
-      <div className="flex gap-1 border-b border-gray-200 overflow-x-auto">
+      <div
+        className="-mx-1 flex gap-1 overflow-x-auto border-b border-los-border pb-px [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        role="tablist"
+        aria-label="Life sections"
+      >
         {TABS.map((t) => (
-          <button key={t.id} onClick={() => setTab(t.id)}
-            className={`shrink-0 px-5 py-2.5 text-sm font-medium transition-colors rounded-t-lg ${
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
+            onClick={() => setTab(t.id)}
+            className={`shrink-0 snap-center rounded-t-lg px-4 py-3 text-sm font-medium transition-colors min-h-[44px] ${
               tab === t.id
-                ? 'bg-gray-900 text-white shadow-sm'
-                : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
-            }`}>
+                ? 'bg-los-gold text-los-text-inverse shadow-los-card'
+                : 'text-los-text-secondary hover:bg-los-bg-secondary hover:text-los-text-primary'
+            }`}
+          >
             {t.label}
           </button>
         ))}
@@ -204,7 +218,7 @@ function JournalSection() {
           </div>
         </div>
         <div className="space-y-6">
-          <div className="flex gap-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:gap-6">
             <MoodSlider label="Mood" value={current.mood} onChange={(v) => setCurrent({ ...current, mood: v })} />
             <MoodSlider label="Energy" value={current.energy} onChange={(v) => setCurrent({ ...current, energy: v })} />
           </div>
@@ -226,9 +240,9 @@ function JournalSection() {
             <div className="mt-3 space-y-2">
               {history.map((e) => (
                 <details key={e.id} className="group rounded-lg border border-gray-200 bg-white">
-                  <summary className="flex cursor-pointer items-center justify-between px-4 py-3 text-sm [&::-webkit-details-marker]:hidden">
+                  <summary className="flex cursor-pointer flex-col gap-2 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between [&::-webkit-details-marker]:hidden">
                     <span className="font-medium text-gray-900">{formatShortDate(e.date)}</span>
-                    <div className="flex items-center gap-4 text-xs text-gray-500">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
                       <span>Mood: {e.mood}/10</span>
                       <span>Energy: {e.energy}/10</span>
                     </div>
@@ -296,7 +310,7 @@ function SleepSection() {
       <Card as="section" aria-label="Sleep Breakdown">
         <div className="flex flex-wrap items-start justify-between gap-6 mb-5">
           <p className="text-xs font-medium uppercase tracking-widest text-gray-400">Sleep Breakdown</p>
-          <div className="rounded-xl bg-gray-50 border border-gray-100 px-6 py-4 text-center min-w-[140px]">
+          <div className="w-full rounded-xl border border-gray-100 bg-gray-50 px-6 py-4 text-center sm:min-w-[140px] sm:w-auto">
             <p className="text-xs font-medium uppercase tracking-widest text-gray-400 mb-1">Sleep Score</p>
             <p className="text-5xl font-bold text-gray-900 tabular-nums leading-none">
               {latestScore}<span className="text-xl font-normal text-gray-400">/100</span>
@@ -1217,14 +1231,12 @@ function IdeasSection() {
       />
 
       {analyzeError && (
-        <Card className="border-amber-200 bg-amber-50 p-4">
-          <p className="text-sm text-amber-900">
-            <span className="font-semibold">Gemini unavailable — showing offline analysis.</span>{' '}
-            {analyzeError.includes('429') || analyzeError.includes('quota')
-              ? 'Your API key has no quota for the default model. Restart dev server after setting GEMINI_MODEL=gemini-2.5-flash in .env.local, then click Re-analyze Idea.'
-              : analyzeError}
-          </p>
-        </Card>
+        <WarningBanner>
+          <span className="font-semibold">Gemini unavailable — showing offline analysis.</span>{' '}
+          {analyzeError.includes('429') || analyzeError.includes('quota')
+            ? 'Your API key has no quota for the default model. Restart dev server after setting GEMINI_MODEL=gemini-2.5-flash in .env.local, then click Re-analyze Idea.'
+            : analyzeError}
+        </WarningBanner>
       )}
 
       {viewingIdea?.analysis && (
@@ -1236,11 +1248,11 @@ function IdeasSection() {
         />
       )}
 
-      <div className="flex gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row">
         <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search ideas..."
-          className="flex-1 rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-900 placeholder-gray-300 focus:border-gray-400 focus:outline-none focus:ring-0" />
+          className="los-input min-h-[44px] flex-1" />
         <button onClick={() => { setEditing(null); setShowForm(!showForm) }}
-          className="shrink-0 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 transition-colors">
+          className="shrink-0 min-h-[44px] rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 transition-colors sm:px-5">
           {showForm ? 'Cancel' : 'Add Idea'}
         </button>
       </div>
@@ -1276,8 +1288,8 @@ function IdeasSection() {
       <div className="space-y-2">
         {filtered.map((item) => (
           <details key={item.id} className="group rounded-lg border border-gray-200 bg-white">
-            <summary className="flex cursor-pointer items-center justify-between px-4 py-3 text-sm [&::-webkit-details-marker]:hidden">
-              <div className="flex items-center gap-3 min-w-0">
+            <summary className="flex cursor-pointer flex-col gap-2 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between [&::-webkit-details-marker]:hidden">
+              <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
                 <span className="font-medium text-gray-900 truncate">{item.title}</span>
                 <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${statusColor(item.status)}`}>
                   {IDEA_STATUSES.find((s) => s.value === item.status)?.label ?? item.status}
@@ -1618,10 +1630,10 @@ function CharacterSection() {
 
                   <div className="flex items-center gap-1">
                     <button onClick={() => handleLevelDown(area.id)} disabled={area.level <= 1}
-                      className="size-7 rounded-lg border border-gray-200 text-sm text-gray-500 hover:border-gray-400 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">−</button>
+                      className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-gray-200 text-sm text-gray-500 hover:border-gray-400 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition-colors sm:size-7">−</button>
                     <span className="flex-1 text-center text-lg font-bold text-gray-900 tabular-nums">{area.level}</span>
                     <button onClick={() => handleLevelUp(area.id)} disabled={area.level >= 10}
-                      className="size-7 rounded-lg border border-gray-200 text-sm text-gray-500 hover:border-gray-400 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">+</button>
+                      className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-gray-200 text-sm text-gray-500 hover:border-gray-400 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition-colors sm:size-7">+</button>
                   </div>
 
                   {area.description && area.description.trim() && (

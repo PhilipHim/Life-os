@@ -4,7 +4,7 @@ import { computeAchievements } from '@/lib/achievements'
 import { computeTitles } from '@/lib/titles'
 import { getTotalXp, getXpHistory } from '@/lib/xp'
 import { getChallengeState } from '@/lib/challenges'
-import { getProfileSettings } from '@/lib/db/profile'
+import { getProfileSettings } from '@/database/profile'
 import type { ProfileData } from '@/lib/profile/types'
 
 export function buildProfileData(): ProfileData {

@@ -5,7 +5,7 @@ import type {
   MvpTimeline,
   BusinessRiskType,
   MonetizationModel,
-} from '@/lib/types'
+} from '@/types'
 
 export type {
   BusinessIdeaAnalysis,

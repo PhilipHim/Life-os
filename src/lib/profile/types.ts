@@ -4,6 +4,9 @@ export interface ProfileStats {
   journalEntries: number
   daysWithoutSickness: number
   longestWellnessStreak: number
+  focusSessions: number
+  focusMinutes: number
+  routinesCreated: number
   currentStreaks: {
     habit: number
     journal: number
@@ -27,7 +30,7 @@ export interface ProfileProgress {
 
 export interface Achievement {
   id: string
-  category: 'task' | 'journal' | 'health' | 'habit'
+  category: 'task' | 'journal' | 'health' | 'habit' | 'focus' | 'routine'
   title: string
   description: string
   unlocked: boolean

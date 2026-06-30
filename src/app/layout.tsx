@@ -1,15 +1,17 @@
 import type { Metadata } from 'next'
 import { Cinzel, Inter } from 'next/font/google'
 import './globals.css'
-import Navbar from '@/components/Navbar'
-import FocusOverlay from '@/components/FocusOverlay'
-import LevelUpListener from '@/components/profile/LevelUpListener'
-import { WorkItemProvider } from '@/lib/WorkItemContext'
-import { RoutineProvider } from '@/lib/RoutineContext'
-import { TaskProvider } from '@/lib/TaskContext'
-import { FocusProvider } from '@/lib/FocusContext'
-import { HabitProvider } from '@/lib/HabitContext'
-import { DailyPlanProvider } from '@/lib/DailyPlanContext'
+import AppChrome from '@/components/layout/AppChrome'
+import { AuthProvider } from '@/contexts/AuthContext'
+import { ThemeProvider } from '@/contexts/ThemeContext'
+import {
+  WorkItemProvider,
+  TaskProvider,
+  FocusProvider,
+  HabitProvider,
+  RoutineProvider,
+  DailyPlanProvider,
+} from '@/providers'
 
 const cinzel = Cinzel({
   variable: '--font-cinzel',
@@ -33,26 +35,32 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={`${cinzel.variable} ${inter.variable} h-full antialiased`}>
-      <body className="los-app-shell flex min-h-full flex-col font-body text-los-text-primary">
-        <WorkItemProvider>
-          <TaskProvider>
-            <FocusProvider>
-              <HabitProvider>
-                <RoutineProvider>
-                  <DailyPlanProvider>
-                    <Navbar />
-                    <main className="los-main mx-auto w-full max-w-6xl flex-1 px-4 py-10 sm:px-8 sm:py-14">
-                      {children}
-                    </main>
-                    <FocusOverlay />
-                    <LevelUpListener />
-                  </DailyPlanProvider>
-                </RoutineProvider>
-              </HabitProvider>
-            </FocusProvider>
-          </TaskProvider>
-        </WorkItemProvider>
+    <html lang="en" className={`${cinzel.variable} ${inter.variable} h-full antialiased`} suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var s=JSON.parse(localStorage.getItem('ascend_settings')||'{}');var t=s.theme||'dark';var a=s.accent||'gold';document.documentElement.dataset.theme=t;document.documentElement.dataset.accent=a;}catch(e){document.documentElement.dataset.theme='dark';document.documentElement.dataset.accent='gold';}})();`,
+          }}
+        />
+      </head>
+      <body className="los-app-shell flex min-h-full flex-col overflow-x-clip font-body text-los-text-primary">
+        <AuthProvider>
+          <ThemeProvider>
+            <WorkItemProvider>
+            <TaskProvider>
+              <FocusProvider>
+                <HabitProvider>
+                  <RoutineProvider>
+                    <DailyPlanProvider>
+                      <AppChrome>{children}</AppChrome>
+                    </DailyPlanProvider>
+                  </RoutineProvider>
+                </HabitProvider>
+              </FocusProvider>
+            </TaskProvider>
+            </WorkItemProvider>
+          </ThemeProvider>
+        </AuthProvider>
       </body>
     </html>
   )

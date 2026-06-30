@@ -1,14 +1,18 @@
 'use client'
 
 import { useState } from 'react'
-import type { RoutineStep, RoutineTemplate } from '@/lib/types'
-import { useRoutines } from '@/lib/RoutineContext'
-import { useDailyPlan } from '@/lib/DailyPlanContext'
-import AddRoutineToPlanModal from '@/components/routines/AddRoutineToPlanModal'
+import type { RoutineStep, RoutineTemplate } from '@/types'
+import { useRoutines } from '@/contexts/RoutineContext'
+import { useDailyPlan } from '@/contexts/DailyPlanContext'
+import AddRoutineToPlanModal from '@/components/features/routines/AddRoutineToPlanModal'
 import Card from '@/components/ui/Card'
-import Button from '@/components/ui/Button'
-
-const DELETE_BTN = 'text-red-500 hover:text-red-600 hover:bg-red-50'
+import Button, { deleteButtonClass } from '@/components/ui/Button'
+import EmptyState from '@/components/common/EmptyState'
+import PageHeader from '@/components/layout/PageHeader'
+import ContextualHint from '@/components/features/first-experience/ContextualHint'
+import { markHintDismissed } from '@/database/first-experience'
+import MobileReorderControls from '@/components/common/MobileReorderControls'
+import { useMinWidth } from '@/utils/useMediaQuery'
 
 function formatEditedDate(ts: number): string {
   return new Date(ts).toLocaleDateString(undefined, {
@@ -27,6 +31,11 @@ function StepRow({
   onDrop,
   onRemove,
   onTextChange,
+  enableDrag = true,
+  onMoveUp,
+  onMoveDown,
+  disableUp,
+  disableDown,
 }: {
   step: RoutineStep
   index: number
@@ -36,19 +45,32 @@ function StepRow({
   onDrop: (index: number) => void
   onRemove: () => void
   onTextChange?: (text: string) => void
+  enableDrag?: boolean
+  onMoveUp?: () => void
+  onMoveDown?: () => void
+  disableUp?: boolean
+  disableDown?: boolean
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(step.type === 'text' ? step.text : '')
 
   return (
     <li
-      draggable
-      onDragStart={() => onDragStart(index)}
-      onDragOver={(e) => onDragOver(e, index)}
-      onDrop={() => onDrop(index)}
-      className="flex items-center gap-2 rounded-lg border border-gray-100 bg-white px-3 py-2 cursor-grab active:cursor-grabbing"
+      draggable={enableDrag}
+      onDragStart={() => enableDrag && onDragStart(index)}
+      onDragOver={(e) => enableDrag && onDragOver(e, index)}
+      onDrop={() => enableDrag && onDrop(index)}
+      className={`flex items-center gap-2 rounded-lg border border-los-border-subtle bg-los-bg-card px-3 py-2 ${enableDrag ? 'md:cursor-grab md:active:cursor-grabbing' : ''}`}
     >
-      <span className="text-gray-300 select-none text-xs" title="Drag to reorder">
+      {onMoveUp && onMoveDown && (
+        <MobileReorderControls
+          onMoveUp={onMoveUp}
+          onMoveDown={onMoveDown}
+          disableUp={disableUp}
+          disableDown={disableDown}
+        />
+      )}
+      <span className="hidden text-los-text-muted/70 select-none text-xs md:inline" title="Drag to reorder" aria-hidden>
         ⠿
       </span>
       {step.type === 'text' ? (
@@ -67,13 +89,13 @@ function StepRow({
                 setEditing(false)
               }
             }}
-            className="flex-1 rounded border border-gray-200 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+            className="flex-1 rounded border border-los-border los-input px-2 py-1 text-sm"
           />
         ) : (
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="flex-1 text-left text-sm text-gray-900 hover:text-gray-600"
+            className="flex-1 text-left text-sm text-los-text-primary hover:text-los-text-secondary"
           >
             {step.text}
           </button>
@@ -114,10 +136,12 @@ export default function RoutinesPage() {
   const [nestedPick, setNestedPick] = useState<Record<string, string>>({})
   const [dragFrom, setDragFrom] = useState<number | null>(null)
   const [plannerRoutineId, setPlannerRoutineId] = useState<string | null>(null)
+  const isDesktop = useMinWidth(768)
 
   const handleCreate = () => {
     const id = createRoutine({ name: 'New Routine' })
     setExpandedId(id)
+    markHintDismissed('routines')
   }
 
   const handleDelete = (routine: RoutineTemplate) => {
@@ -147,27 +171,26 @@ export default function RoutinesPage() {
   }
 
   return (
-    <div className="space-y-10">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-4xl font-bold tracking-tight">Routines</h1>
-          <p className="mt-2 text-sm text-gray-500 max-w-2xl">
-            Reusable step-by-step checklists. Independent from Tasks — add any routine to the Planner
-            as one scheduled block when you need it.
-          </p>
-          <p className="mt-1 text-xs text-gray-400">Routines → Today&apos;s Planner</p>
-        </div>
+    <div className="los-page space-y-10">
+      <PageHeader
+        title="Routines"
+        subtitle="Reusable step-by-step checklists. Independent from Tasks — add any routine to the Planner as one scheduled block when you need it."
+        meta="Routines → Today's Planner"
+      >
         <Button onClick={handleCreate} className="shrink-0">
           Create Routine
         </Button>
-      </div>
+      </PageHeader>
+
+      <ContextualHint section="routines" message="Reusable workflows for your daily habits." />
 
       {routines.length === 0 && (
-        <Card>
-          <p className="py-8 text-center text-sm text-gray-400">
-            No routines yet. Click Create Routine to start building your first checklist.
-          </p>
-        </Card>
+        <EmptyState
+          title="Build your first routine"
+          action={{ label: 'Create your first routine', onClick: handleCreate }}
+        >
+          Routines turn repeatable habits into checklists you can drop into your Planner.
+        </EmptyState>
       )}
 
       <div className="space-y-3">
@@ -181,11 +204,11 @@ export default function RoutinesPage() {
             recurring?.estimatedDuration ?? routine.estimatedDuration
 
           return (
-            <Card key={routine.id} className="transition-all hover:border-gray-300 hover:shadow-md">
+            <Card key={routine.id} className="transition-all hover:border-los-border hover:shadow-los-card-hover">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-semibold text-gray-900">{routine.name}</p>
+                    <p className="font-semibold text-los-text-primary">{routine.name}</p>
                     {recurring && (
                       <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
                         Daily ·{' '}
@@ -198,9 +221,9 @@ export default function RoutinesPage() {
                     )}
                   </div>
                   {routine.description && !isExpanded && (
-                    <p className="text-sm text-gray-500 mt-1 line-clamp-2">{routine.description}</p>
+                    <p className="text-sm text-los-text-secondary mt-1 line-clamp-2">{routine.description}</p>
                   )}
-                  <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-400">
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-los-text-muted">
                     <span>
                       {stepCount} step{stepCount !== 1 ? 's' : ''}
                     </span>
@@ -210,15 +233,15 @@ export default function RoutinesPage() {
                   {!isExpanded && routine.steps.length > 0 && (
                     <ul className="mt-2 space-y-0.5">
                       {routine.steps.slice(0, 3).map((step) => (
-                        <li key={step.id} className="text-xs text-gray-500 truncate">
-                          <span className="text-gray-400 mr-1.5">•</span>
+                        <li key={step.id} className="text-xs text-los-text-secondary truncate">
+                          <span className="text-los-text-muted mr-1.5">•</span>
                           {step.type === 'text'
                             ? step.text
                             : `▶ ${routines.find((r) => r.id === step.routineId)?.name ?? 'Routine'}`}
                         </li>
                       ))}
                       {routine.steps.length > 3 && (
-                        <li className="text-xs text-gray-400">...</li>
+                        <li className="text-xs text-los-text-muted">...</li>
                       )}
                     </ul>
                   )}
@@ -226,7 +249,7 @@ export default function RoutinesPage() {
                 <button
                   type="button"
                   onClick={() => setExpandedId(isExpanded ? null : routine.id)}
-                  className="text-gray-400 hover:text-gray-700 shrink-0"
+                  className="text-los-text-muted hover:text-los-text-primary shrink-0"
                   aria-label={isExpanded ? 'Collapse' : 'Expand'}
                 >
                   <svg
@@ -241,23 +264,23 @@ export default function RoutinesPage() {
                 </button>
               </div>
 
-              <div className="flex flex-wrap gap-1 mt-2">
+                  <div className="flex flex-wrap gap-1 mt-2">
                 <Button variant="ghost" size="sm" onClick={() => setPlannerRoutineId(routine.id)}>
                   Add to Planner
                 </Button>
                 <Button variant="ghost" size="sm" onClick={() => duplicateRoutine(routine.id)}>
                   Duplicate
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => handleDelete(routine)} className={DELETE_BTN}>
+                <Button variant="ghost" size="sm" onClick={() => handleDelete(routine)} className={deleteButtonClass}>
                   Delete
                 </Button>
               </div>
 
               {isExpanded && (
-                <div className="mt-4 space-y-4 border-t border-gray-100 pt-4">
+                <div className="mt-4 space-y-4 border-t border-los-border-subtle pt-4">
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div>
-                      <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-gray-400">
+                      <label className="mb-1 block los-section-label">
                         Name
                       </label>
                       <input
@@ -265,11 +288,11 @@ export default function RoutinesPage() {
                         defaultValue={routine.name}
                         key={`name-${routine.id}-${routine.updatedAt}`}
                         onBlur={(e) => saveMeta(routine, { name: e.target.value })}
-                        className="min-h-[36px] w-full rounded-lg border border-gray-300 bg-white px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                        className="los-input min-h-[36px] w-full"
                       />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-gray-400">
+                      <label className="mb-1 block los-section-label">
                         Default duration (min)
                       </label>
                       <input
@@ -284,12 +307,12 @@ export default function RoutinesPage() {
                             estimatedDuration: val ? Math.max(1, parseInt(val, 10) || 1) : undefined,
                           })
                         }}
-                        className="min-h-[36px] w-full rounded-lg border border-gray-300 bg-white px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                        className="los-input min-h-[36px] w-full"
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-gray-400">
+                    <label className="mb-1 block los-section-label">
                       Description
                     </label>
                     <textarea
@@ -298,7 +321,7 @@ export default function RoutinesPage() {
                       onBlur={(e) => saveMeta(routine, { description: e.target.value })}
                       placeholder="What is this routine for?"
                       rows={2}
-                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                      className="los-textarea w-full"
                     />
                   </div>
 
@@ -315,11 +338,11 @@ export default function RoutinesPage() {
                   )}
 
                   <div>
-                    <p className="mb-2 text-xs font-medium uppercase tracking-widest text-gray-400">
+                    <p className="mb-2 los-section-label">
                       Steps
                     </p>
                     {routine.steps.length === 0 && (
-                      <p className="text-xs text-gray-400 mb-2">
+                      <p className="text-xs text-los-text-muted mb-2">
                         No steps yet. Add your first step below.
                       </p>
                     )}
@@ -329,6 +352,15 @@ export default function RoutinesPage() {
                           key={step.id}
                           step={step}
                           index={index}
+                          enableDrag={isDesktop}
+                          onMoveUp={() => {
+                            if (index > 0) reorderSteps(routine.id, index, index - 1)
+                          }}
+                          onMoveDown={() => {
+                            if (index < routine.steps.length - 1) reorderSteps(routine.id, index, index + 1)
+                          }}
+                          disableUp={index === 0}
+                          disableDown={index === routine.steps.length - 1}
                           nestedName={
                             step.type === 'routine'
                               ? routines.find((r) => r.id === step.routineId)?.name
@@ -368,7 +400,7 @@ export default function RoutinesPage() {
                           setNewStepText((prev) => ({ ...prev, [routine.id]: '' }))
                         }
                       }}
-                      className="min-h-[36px] flex-1 rounded-lg border border-gray-300 bg-white px-3 text-sm placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                      className="los-input min-h-[36px] flex-1"
                     />
                     <Button
                       size="sm"
@@ -382,13 +414,13 @@ export default function RoutinesPage() {
                   </div>
 
                   {nestedOptions.length > 0 && (
-                    <div className="flex gap-2">
+                    <div className="flex flex-col gap-2 sm:flex-row">
                       <select
                         value={nestedPick[routine.id] ?? ''}
                         onChange={(e) =>
                           setNestedPick((prev) => ({ ...prev, [routine.id]: e.target.value }))
                         }
-                        className="min-h-[36px] flex-1 rounded-lg border border-gray-300 bg-white px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                        className="los-select min-h-[36px] flex-1"
                       >
                         <option value="">Add nested routine...</option>
                         {nestedOptions.map((r) => (

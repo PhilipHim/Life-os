@@ -1,4 +1,4 @@
-import type { CharacterArea } from '@/lib/types'
+import type { CharacterArea } from '@/types'
 import type { CharacterCoachItem } from '@/lib/coach/types'
 
 const TRAIT_ACTIONS: Record<string, string> = {

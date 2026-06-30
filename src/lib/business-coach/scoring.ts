@@ -5,7 +5,7 @@ import type {
   MvpTimeline,
   BusinessRiskType,
   MonetizationModel,
-} from '@/lib/types'
+} from '@/types'
 
 const MARKET_KEYWORDS = [
   { words: ['saas', 'platform', 'marketplace', 'b2b', 'enterprise'], boost: 2 },

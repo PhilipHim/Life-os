@@ -1,9 +1,11 @@
 'use client'
 
 import Link from 'next/link'
-import { useHabits } from '@/lib/HabitContext'
+import { useHabits } from '@/contexts/HabitContext'
 import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
+import EmptyState from '@/components/common/EmptyState'
+import PageHeader from '@/components/layout/PageHeader'
 
 export default function TodayPage() {
   const {
@@ -20,21 +22,20 @@ export default function TodayPage() {
   const allTotal = buildTotal + avoidTotal
 
   return (
-    <div className="space-y-10">
-      <div className="flex items-center justify-between">
-        <h1 className="text-4xl font-bold tracking-tight">Today</h1>
+    <div className="los-page space-y-10">
+      <PageHeader title="Today" subtitle="Track today's habit progress.">
         <Link href="/habits">
           <Button variant="secondary" size="sm">All Habits</Button>
         </Link>
-      </div>
+      </PageHeader>
 
       {allTotal > 0 && (
         <Card>
           <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-medium uppercase tracking-widest text-gray-400">Progress</p>
-            <p className="text-sm text-gray-500">{allDone} / {allTotal}</p>
+            <p className="los-section-label">Progress</p>
+            <p className="text-sm text-los-text-secondary">{allDone} / {allTotal}</p>
           </div>
-          <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+          <div className="h-2 rounded-full bg-los-bg-secondary overflow-hidden">
             <div
               className="h-full rounded-full bg-green-500 transition-all"
               style={{ width: `${allTotal > 0 ? (allDone / allTotal) * 100 : 0}%` }}
@@ -44,19 +45,19 @@ export default function TodayPage() {
       )}
 
       {activeHabits.length === 0 && (
-        <Card>
-          <p className="text-center text-sm text-gray-400 py-6">
-            No active habits.{' '}
-            <Link href="/habits" className="text-gray-900 underline">Create Habits</Link>
-          </p>
-        </Card>
+        <EmptyState>
+          No active habits.{' '}
+          <Link href="/habits" className="text-los-gold underline hover:text-los-gold-light">
+            Create Habits
+          </Link>
+        </EmptyState>
       )}
 
       {buildHabits.length > 0 && (
         <div>
           <div className="flex items-center gap-3 mb-4">
-            <h2 className="text-xl font-semibold tracking-tight">Build</h2>
-            <span className="text-sm text-gray-400">{buildDone}/{buildTotal}</span>
+            <h2 className="text-xl font-semibold tracking-tight text-los-text-primary">Build</h2>
+            <span className="text-sm text-los-text-muted">{buildDone}/{buildTotal}</span>
           </div>
           <div className="space-y-3">
             {buildHabits.map((habit) => {
@@ -68,30 +69,30 @@ export default function TodayPage() {
                 : done ? 100 : 0
 
               return (
-                <Card key={habit.id} className="transition-all hover:border-gray-300 hover:shadow-md">
-                  <div className="flex items-center gap-4">
-                    <span className={`shrink-0 text-lg ${done ? 'text-green-500' : 'text-gray-300'}`}>
+                <Card key={habit.id} variant="interactive">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+                    <span className={`shrink-0 text-lg ${done ? 'text-green-500' : 'text-los-text-muted'}`}>
                       {done ? '✔' : '○'}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <p className={`font-medium ${done ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
+                      <p className={`font-medium ${done ? 'text-los-text-muted line-through' : 'text-los-text-primary'}`}>
                         {habit.title}
                       </p>
                       {habit.type !== 'checkbox' && (
                         <div className="flex items-center gap-3 mt-1.5">
-                          <div className="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                          <div className="flex-1 h-1.5 rounded-full bg-los-bg-secondary overflow-hidden">
                             <div
-                              className={`h-full rounded-full transition-all ${done ? 'bg-green-500' : 'bg-gray-900'}`}
+                              className={`h-full rounded-full transition-all ${done ? 'bg-green-500' : 'los-progress-gold'}`}
                               style={{ width: `${progress}%` }}
                             />
                           </div>
-                          <span className="shrink-0 text-xs text-gray-400">
+                          <span className="shrink-0 text-xs text-los-text-muted">
                             {habit.type === 'time' ? `${currentValue}/${habit.targetValue} min` : `${currentValue}/${habit.targetValue}`}
                           </span>
                         </div>
                       )}
                     </div>
-                    <div className="shrink-0 flex gap-2">
+                    <div className="shrink-0 flex flex-wrap gap-2">
                       {habit.type === 'checkbox' && (
                         <Button size="sm" variant={done ? 'secondary' : 'primary'} onClick={() => toggleCheckbox(habit.id)}>
                           {done ? 'Undo' : 'Done'}
@@ -119,7 +120,7 @@ export default function TodayPage() {
                             name="value"
                             type="number"
                             placeholder="Menge"
-                            className="min-h-[36px] w-20 rounded-lg border border-gray-300 bg-white px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-1"
+                            className="los-input min-h-[36px] w-20"
                           />
                           <Button type="submit" variant="secondary" size="sm">OK</Button>
                         </form>
@@ -136,21 +137,21 @@ export default function TodayPage() {
       {avoidHabits.length > 0 && (
         <div>
           <div className="flex items-center gap-3 mb-4">
-            <h2 className="text-xl font-semibold tracking-tight">Avoid</h2>
-            <span className="text-sm text-gray-400">{avoidSuccess}/{avoidTotal}</span>
+            <h2 className="text-xl font-semibold tracking-tight text-los-text-primary">Avoid</h2>
+            <span className="text-sm text-los-text-muted">{avoidSuccess}/{avoidTotal}</span>
           </div>
           <div className="space-y-3">
             {avoidHabits.map((habit) => {
               const avoided = isHabitSuccessful(habit.id)
               const entry = getEntryForHabit(habit.id)
               return (
-                <Card key={habit.id} className="transition-all hover:border-gray-300 hover:shadow-md">
-                  <div className="flex items-center gap-4">
+                <Card key={habit.id} variant="interactive">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
                     <span className={`shrink-0 text-lg ${avoided ? 'text-green-500' : 'text-red-400'}`}>
                       {avoided ? '✔' : '✘'}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <p className={`font-medium ${avoided ? 'text-gray-900' : 'text-red-500'}`}>
+                      <p className={`font-medium ${avoided ? 'text-los-text-primary' : 'text-red-500'}`}>
                         {habit.title}
                       </p>
                       {entry && (

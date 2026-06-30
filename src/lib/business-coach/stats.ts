@@ -1,4 +1,4 @@
-import type { BusinessIdea } from '@/lib/types'
+import type { BusinessIdea } from '@/types'
 import type { BusinessIdeasStats } from '@/lib/business-coach/types'
 import { computePromisingScore } from '@/lib/business-coach/scoring'
 
