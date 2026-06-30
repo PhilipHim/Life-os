@@ -15,9 +15,12 @@ export function getTasks(): Task[] {
       description: t.description || '',
       notes: t.notes || '',
       completed: t.completed ?? (t as any).done ?? false,
+      deleted: (t as any).deleted ?? false,
       recurring: (t as any).recurring || 'none',
       completedAt: (t as any).completedAt ?? null,
       createdAt: t.createdAt || Date.now(),
+      priority: (t as any).priority ?? 'M',
+      estimatedDuration: (t as any).estimatedDuration ?? 30,
     }))
   } catch {
     return []
@@ -46,5 +49,27 @@ export function updateTask(updated: Task): Task[] {
 
 export function deleteTask(id: string): Task[] {
   saveTasks(getTasks().filter((t) => t.id !== id))
+  return getTasks()
+}
+
+export function softDeleteTask(id: string): Task[] {
+  const tasks = getTasks()
+  saveTasks(tasks.map((t) => (t.id === id ? { ...t, deleted: true } : t)))
+  return getTasks()
+}
+
+export function restoreTask(id: string): Task[] {
+  const tasks = getTasks()
+  saveTasks(tasks.map((t) => (t.id === id ? { ...t, deleted: false } : t)))
+  return getTasks()
+}
+
+export function deleteAllCompletedTasks(): Task[] {
+  saveTasks(getTasks().filter((t) => !(t.recurring === 'none' && t.completed && !t.deleted)))
+  return getTasks()
+}
+
+export function emptyTrashTasks(): Task[] {
+  saveTasks(getTasks().filter((t) => !t.deleted))
   return getTasks()
 }

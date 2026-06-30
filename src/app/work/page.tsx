@@ -1,9 +1,8 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import type { WorkItem } from '@/lib/types'
 import { useWorkItems } from '@/lib/WorkItemContext'
-import { updateWorkItem } from '@/lib/db/work-items'
 import {
   generateTodayInstances,
   toggleRecurringCompletion,
@@ -18,35 +17,62 @@ import DetailsPanel from '@/components/DetailsPanel'
 import AddToPlanFlow from '@/components/AddToPlanFlow'
 import { useDailyPlan } from '@/lib/DailyPlanContext'
 
-type ViewMode = 'all' | 'active' | 'completed'
+type ViewMode = 'active' | 'completed' | 'all'
+
+const CHILD_PREVIEW_LIMIT = 3
+const DELETE_BTN = 'text-red-500 hover:text-red-600 hover:bg-red-50'
+
+function listEmptyMessage(viewFilter: ViewMode, searchQuery: string): string {
+  if (searchQuery.trim()) return 'No tasks match your search.'
+  if (viewFilter === 'active') return 'No open tasks.'
+  if (viewFilter === 'completed') return 'No completed tasks.'
+  return 'No tasks yet. Create one above.'
+}
+
+function groupChildPreviewLines(children: WorkItem[]): string[] {
+  if (children.length === 0) return []
+  if (children.length <= CHILD_PREVIEW_LIMIT) {
+    return children.map((c) => c.title)
+  }
+  const lines = children.slice(0, CHILD_PREVIEW_LIMIT).map((c) => c.title)
+  lines[CHILD_PREVIEW_LIMIT - 1] = `${lines[CHILD_PREVIEW_LIMIT - 1]}...`
+  return lines
+}
+
+function activeUnassignedSingles(items: WorkItem[]): WorkItem[] {
+  return items.filter((i) => i.status === 'active')
+}
 
 export default function WorkPage() {
   const {
-    workItems, addWorkItem, toggleWorkItem, deleteWorkItem,
-    restoreWorkItem, permanentDeleteWorkItem,
+    workItems, toggleWorkItem, deleteWorkItem, deleteRecurringTemplate,
+    restoreWorkItem, permanentDeleteWorkItem, deleteAllCompleted, emptyTrash,
+    updateWorkItem,
     getChildren, addChildToGroup, removeChildFromGroup, unassignedSingles,
-    createGroupWithChildren, recurringTemplates,
+    createGroupWithChildren, createSingleWorkItem, recurringTemplates,
   } = useWorkItems()
   const { todayPlan } = useDailyPlan()
 
   const [mode, setMode] = useState<'single' | 'group'>('single')
   const [input, setInput] = useState('')
   const [singleDescription, setSingleDescription] = useState('')
+  const [singleDetails, setSingleDetails] = useState('')
   const [groupTitle, setGroupTitle] = useState('')
   const [groupDescription, setGroupDescription] = useState('')
-  const [childInput, setChildInput] = useState('')
+  const [childInputs, setChildInputs] = useState<Record<string, string>>({})
+  const [existingSearches, setExistingSearches] = useState<Record<string, string>>({})
   const [taskRows, setTaskRows] = useState<{ id: string; title: string; description: string }[]>([
     { id: crypto.randomUUID(), title: '', description: '' },
   ])
+  const [groupExistingSearch, setGroupExistingSearch] = useState('')
+  const [selectedExistingIds, setSelectedExistingIds] = useState<Set<string>>(new Set())
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const [addingExistingTo, setAddingExistingTo] = useState<string | null>(null)
-  const [existingSearch, setExistingSearch] = useState('')
   const [panelItem, setPanelItem] = useState<WorkItem | null>(null)
   const [planTargetItem, setPlanTargetItem] = useState<{ id: string; title: string } | null>(null)
-  const [showCompleted, setShowCompleted] = useState(false)
   const [showDeleted, setShowDeleted] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [viewFilter, setViewFilter] = useState<ViewMode>('all')
+  const [viewFilter, setViewFilter] = useState<ViewMode>('active')
   const [recurringRefreshKey, setRecurringRefreshKey] = useState(0)
 
   const todayRecurringInstances = useMemo(
@@ -74,9 +100,14 @@ export default function WorkPage() {
     e.preventDefault()
     const title = input.trim()
     if (!title) return
-    addWorkItem(title, 'single', singleDescription.trim() || undefined)
+    createSingleWorkItem({
+      title,
+      description: singleDescription.trim(),
+      notes: singleDetails.trim(),
+    })
     setInput('')
     setSingleDescription('')
+    setSingleDetails('')
   }
 
   const addTaskRow = () => {
@@ -97,26 +128,41 @@ export default function WorkPage() {
       title: r.title.trim(),
       description: r.description.trim() || undefined,
     }))
-    createGroupWithChildren(title, groupDescription.trim(), children)
+    createGroupWithChildren(title, groupDescription.trim(), children, [...selectedExistingIds])
     setGroupTitle('')
     setGroupDescription('')
     setTaskRows([{ id: crypto.randomUUID(), title: '', description: '' }])
+    setGroupExistingSearch('')
+    setSelectedExistingIds(new Set())
+  }
+
+  const toggleGroupExistingSelection = (id: string) => {
+    setSelectedExistingIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   }
 
   const handleAddChild = (groupId: string) => {
-    const title = childInput.trim()
+    const title = (childInputs[groupId] ?? '').trim()
     if (!title) return
-    addWorkItem(title, 'single', undefined)
-    const fresh = JSON.parse(localStorage.getItem('productivity_work_items') || '[]') as WorkItem[]
-    const child = fresh.find((i) => i.title === title && !i.parentId && !i.isTemplate)
-    if (child) addChildToGroup(groupId, child.id)
-    setChildInput('')
+    const childId = createSingleWorkItem({ title, description: '', notes: '' })
+    addChildToGroup(groupId, childId)
+    setChildInputs((prev) => ({ ...prev, [groupId]: '' }))
   }
 
   const handleUpdate = (updated: WorkItem) => {
     updateWorkItem(updated)
-    setPanelItem(null)
+    setPanelItem(updated)
   }
+
+  useEffect(() => {
+    if (!panelItem) return
+    const fresh = workItems.find((i) => i.id === panelItem.id)
+    if (fresh && fresh.updatedAt !== panelItem.updatedAt) setPanelItem(fresh)
+  }, [workItems, panelItem])
 
   const toggleGroup = (id: string) => {
     setExpandedGroups((prev) => {
@@ -127,41 +173,80 @@ export default function WorkPage() {
     })
   }
 
-  const filteredExisting = useMemo(() => {
-    return unassignedSingles.filter((s) =>
-      s.title.toLowerCase().includes(existingSearch.toLowerCase())
+  const getExistingSearch = (groupId: string) => existingSearches[groupId] ?? ''
+
+  const filteredExistingForGroup = useCallback(
+    (groupId: string) => {
+      const q = getExistingSearch(groupId).toLowerCase()
+      return activeUnassignedSingles(unassignedSingles).filter((s) => s.title.toLowerCase().includes(q))
+    },
+    [unassignedSingles, existingSearches]
+  )
+
+  const selectableForGroup = useMemo(() => {
+    return activeUnassignedSingles(unassignedSingles).filter((s) =>
+      s.title.toLowerCase().includes(groupExistingSearch.toLowerCase())
     )
-  }, [unassignedSingles, existingSearch])
+  }, [unassignedSingles, groupExistingSearch])
 
   const deletedItems = workItems.filter((i) => i.status === 'deleted')
 
+  const matchesSearch = useCallback(
+    (item: WorkItem) => item.title.toLowerCase().includes(searchQuery.toLowerCase()),
+    [searchQuery]
+  )
+
+  const isListItem = (item: WorkItem) =>
+    item.status !== 'deleted' && !item.isTemplate && (item.type === 'single' ? !item.parentId : true)
+
   const standaloneItems = useMemo(() => {
-    return workItems.filter((i) => i.status !== 'deleted' && i.type === 'single' && !i.parentId && !i.isTemplate).filter((i) => {
-      const matchesSearch = i.title.toLowerCase().includes(searchQuery.toLowerCase())
-      const matchesView =
-        viewFilter === 'all' ||
-        (viewFilter === 'active' && i.status === 'active') ||
-        (viewFilter === 'completed' && i.status === 'completed')
-      return matchesSearch && matchesView
-    })
-  }, [workItems, searchQuery, viewFilter])
+    return workItems
+      .filter((i) => isListItem(i) && i.type === 'single')
+      .filter((i) => {
+        const matchesView =
+          viewFilter === 'all' ||
+          (viewFilter === 'active' && i.status === 'active') ||
+          (viewFilter === 'completed' && i.status === 'completed')
+        return matchesSearch(i) && matchesView
+      })
+  }, [workItems, matchesSearch, viewFilter])
 
   const groupItemsList = useMemo(() => {
-    return workItems.filter((i) => i.status !== 'deleted' && i.type === 'group').filter((i) => {
-      const matchesSearch = i.title.toLowerCase().includes(searchQuery.toLowerCase())
-      const matchesView =
-        viewFilter === 'all' ||
-        (viewFilter === 'active' && i.status === 'active') ||
-        (viewFilter === 'completed' && i.status === 'completed')
-      return matchesSearch && matchesView
-    })
-  }, [workItems, searchQuery, viewFilter])
+    return workItems
+      .filter((i) => isListItem(i) && i.type === 'group')
+      .filter((i) => {
+        const matchesView =
+          viewFilter === 'all' ||
+          (viewFilter === 'active' && i.status === 'active') ||
+          (viewFilter === 'completed' && i.status === 'completed')
+        return matchesSearch(i) && matchesView
+      })
+  }, [workItems, matchesSearch, viewFilter])
+
+  const completedCount = useMemo(
+    () => workItems.filter((i) => isListItem(i) && i.status === 'completed').length,
+    [workItems]
+  )
+
+  const handleDeleteAllCompleted = () => {
+    if (!window.confirm('Delete all completed tasks? This cannot be undone.')) return
+    deleteAllCompleted()
+    if (viewFilter === 'completed') setViewFilter('active')
+  }
+
+  const handleEmptyTrash = () => {
+    if (!window.confirm('Permanently delete all items in trash? This cannot be undone.')) return
+    emptyTrash()
+  }
 
   const plannedIds = useMemo(() => new Set(todayPlan.map((p) => p.workItemId)), [todayPlan])
 
+  const showListEmpty = standaloneItems.length === 0 && groupItemsList.length === 0
+  const listEmpty = listEmptyMessage(viewFilter, searchQuery)
+
   return (
     <div className="space-y-10">
-      <h1 className="text-4xl font-bold tracking-tight">Work Items</h1>
+      <h1 className="text-4xl font-bold tracking-tight">Tasks</h1>
 
       <Card>
         <div className="flex gap-1 mb-6">
@@ -197,7 +282,14 @@ export default function WorkPage() {
               rows={2}
               className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-1"
             />
-            <Button type="submit">Add</Button>
+            <textarea
+              value={singleDetails}
+              onChange={(e) => setSingleDetails(e.target.value)}
+              placeholder="Details (optional)..."
+              rows={2}
+              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-1"
+            />
+            <Button type="submit">Add Task</Button>
           </form>
         ) : (
           <form onSubmit={handleGroupSubmit} className="space-y-4">
@@ -215,8 +307,8 @@ export default function WorkPage() {
               rows={2}
               className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-1"
             />
-            <div className="space-y-2">
-              <p className="text-xs font-medium uppercase tracking-widest text-gray-400">Tasks</p>
+            <div className="space-y-3">
+              <p className="text-xs font-medium uppercase tracking-widest text-gray-400">Create New Tasks</p>
               {taskRows.map((row, idx) => (
                 <div key={row.id} className="flex items-start gap-2">
                   <input
@@ -262,14 +354,50 @@ export default function WorkPage() {
                 + Add another task
               </button>
             </div>
+
+            <div className="space-y-3 border-t border-gray-100 pt-4">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-medium uppercase tracking-widest text-gray-400">Select Existing Tasks</p>
+                {selectedExistingIds.size > 0 && (
+                  <span className="text-xs text-gray-500">{selectedExistingIds.size} selected</span>
+                )}
+              </div>
+              <input
+                type="text"
+                value={groupExistingSearch}
+                onChange={(e) => setGroupExistingSearch(e.target.value)}
+                placeholder="Search active tasks..."
+                className="min-h-[36px] w-full rounded-lg border border-gray-300 bg-white px-3 text-sm placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-1"
+              />
+              <div className="max-h-48 overflow-y-auto rounded-lg border border-gray-200 divide-y divide-gray-100">
+                {selectableForGroup.length === 0 && (
+                  <p className="px-3 py-4 text-center text-xs text-gray-400">No active unassigned tasks found.</p>
+                )}
+                {selectableForGroup.map((task) => (
+                  <label
+                    key={task.id}
+                    className="flex cursor-pointer items-center gap-3 px-3 py-2.5 hover:bg-gray-50 transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedExistingIds.has(task.id)}
+                      onChange={() => toggleGroupExistingSelection(task.id)}
+                      className="size-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
+                    />
+                    <span className="text-sm text-gray-900">{task.title}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
             <Button type="submit">Create Group</Button>
           </form>
         )}
       </Card>
 
       <div className="flex items-center justify-between gap-4">
-        <div className="flex gap-1">
-          {(['all', 'active', 'completed'] as const).map((f) => (
+        <div className="flex flex-wrap items-center gap-1">
+          {(['active', 'completed', 'all'] as const).map((f) => (
             <button
               key={f}
               onClick={() => setViewFilter(f)}
@@ -279,9 +407,19 @@ export default function WorkPage() {
                   : 'rounded-lg px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-900'
               }
             >
-              {f === 'all' ? 'All' : f === 'active' ? 'Active' : 'Completed'}
+              {f === 'active' ? 'Open Tasks' : f === 'completed' ? 'Completed Tasks' : 'All Tasks'}
             </button>
           ))}
+          {viewFilter === 'completed' && completedCount > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleDeleteAllCompleted}
+              className="text-red-500 hover:text-red-600 hover:bg-red-50"
+            >
+              Delete All Completed
+            </Button>
+          )}
         </div>
         <input
           type="text"
@@ -295,7 +433,7 @@ export default function WorkPage() {
       <div className="space-y-8">
         {todayRecurringInstances.length > 0 && (
           <div className="space-y-3">
-            <h2 className="text-lg font-semibold text-gray-900">Today's Recurring</h2>
+            <p className="text-xs font-medium uppercase tracking-widest text-gray-400">Today&apos;s Recurring</p>
             {todayRecurringInstances
               .filter((i) => i.title.toLowerCase().includes(searchQuery.toLowerCase()))
               .map((item) => {
@@ -340,6 +478,7 @@ export default function WorkPage() {
                     ) : (
                       <Button variant="ghost" size="sm" onClick={() => handleSkipRecurringInstance(item.templateId)}>Skip</Button>
                     )}
+                    <Button variant="ghost" size="sm" onClick={() => deleteRecurringTemplate(item.templateId)} className={DELETE_BTN}>Delete</Button>
                   </div>
                 </div>
               </Card>
@@ -347,13 +486,13 @@ export default function WorkPage() {
           </div>
         )}
 
-        {standaloneItems.length === 0 && groupItemsList.length === 0 && todayRecurringInstances.length === 0 && (
-          <Card><p className="text-center text-sm text-gray-400 py-6">No items found.</p></Card>
+        {showListEmpty && (
+          <Card><p className="text-center text-sm text-gray-400 py-6">{listEmpty}</p></Card>
         )}
 
         {standaloneItems.length > 0 && (
           <div className="space-y-3">
-            <h2 className="text-lg font-semibold text-gray-900">Individual Items</h2>
+            <p className="text-xs font-medium uppercase tracking-widest text-gray-400">Tasks</p>
             {standaloneItems.map((item) => (
               <Card key={item.id} className="transition-all hover:border-gray-300 hover:shadow-md">
                 <div className="flex items-center gap-4">
@@ -372,7 +511,7 @@ export default function WorkPage() {
                   <div className="flex gap-1">
                     <Button variant="ghost" size="sm" onClick={() => setPanelItem(item)}>Details</Button>
                     <Button variant="ghost" size="sm" onClick={() => setPlanTargetItem({ id: item.id, title: item.title })} className={plannedIds.has(item.id) ? 'text-green-600' : ''}>Plan</Button>
-                    <Button variant="ghost" size="sm" onClick={() => deleteWorkItem(item.id)} className="text-red-400 hover:text-red-600 hover:bg-red-50">Delete</Button>
+                    <Button variant="ghost" size="sm" onClick={() => deleteWorkItem(item.id)} className={DELETE_BTN}>Delete</Button>
                   </div>
                 </div>
               </Card>
@@ -382,12 +521,13 @@ export default function WorkPage() {
 
         {groupItemsList.length > 0 && (
           <div className="space-y-3">
-            <h2 className="text-lg font-semibold text-gray-900">Groups</h2>
+            <p className="text-xs font-medium uppercase tracking-widest text-gray-400">Groups</p>
             {groupItemsList.map((item) => {
               const children = getChildren(item.id)
               const doneChildren = children.filter((c) => c.status === 'completed').length
               const progress = children.length > 0 ? Math.round((doneChildren / children.length) * 100) : 0
               const isExpanded = expandedGroups.has(item.id)
+              const previewLines = groupChildPreviewLines(children)
 
               return (
                 <div key={item.id} className="space-y-2">
@@ -419,6 +559,16 @@ export default function WorkPage() {
                             </svg>
                           </button>
                         </div>
+                        {previewLines.length > 0 && (
+                          <ul className="mt-1.5 space-y-0.5">
+                            {previewLines.map((line, idx) => (
+                              <li key={idx} className="text-xs text-gray-500 truncate pl-0.5">
+                                <span className="text-gray-400 mr-1.5">•</span>
+                                {line}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                         {item.description && (
                           <p className="text-sm text-gray-500 mt-1">{item.description}</p>
                         )}
@@ -434,7 +584,7 @@ export default function WorkPage() {
                         <div className="flex gap-2 mt-2">
                           <Button variant="ghost" size="sm" onClick={() => setPanelItem(item)}>Details</Button>
                           <Button variant="ghost" size="sm" onClick={() => setPlanTargetItem({ id: item.id, title: item.title })} className={plannedIds.has(item.id) ? 'text-green-600' : ''}>Plan</Button>
-                          <Button variant="ghost" size="sm" onClick={() => deleteWorkItem(item.id)} className="text-red-400 hover:text-red-600 hover:bg-red-50">Delete</Button>
+                          <Button variant="ghost" size="sm" onClick={() => deleteWorkItem(item.id)} className={DELETE_BTN}>Delete</Button>
                         </div>
                       </div>
                     </div>
@@ -443,8 +593,12 @@ export default function WorkPage() {
                   {isExpanded && (
                     <div className="ml-8 space-y-2 pl-4 border-l-2 border-gray-100">
                       <p className="text-xs font-medium uppercase tracking-widest text-gray-400">
-                        Items inside this group
+                        Tasks in group
                       </p>
+
+                      {children.length === 0 && (
+                        <p className="text-xs text-gray-400 py-1">No tasks in this group yet.</p>
+                      )}
 
                       {children.map((child) => (
                         <Card key={child.id} className="py-3 px-4">
@@ -463,7 +617,6 @@ export default function WorkPage() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => removeChildFromGroup(item.id, child.id)}
-                                className="text-orange-400 hover:text-orange-600 hover:bg-orange-50"
                               >
                                 Remove
                               </Button>
@@ -475,9 +628,9 @@ export default function WorkPage() {
                       <div className="flex gap-2 pt-1">
                         <input
                           type="text"
-                          value={childInput}
-                          onChange={(e) => setChildInput(e.target.value)}
-                          placeholder="Create new item..."
+                          value={childInputs[item.id] ?? ''}
+                          onChange={(e) => setChildInputs((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                          placeholder="New task title..."
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
                               e.preventDefault()
@@ -486,31 +639,38 @@ export default function WorkPage() {
                           }}
                           className="min-h-[36px] flex-1 rounded-lg border border-gray-300 bg-white px-3 text-sm placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-1"
                         />
-                        <Button size="sm" onClick={() => handleAddChild(item.id)}>Create</Button>
+                        <Button size="sm" onClick={() => handleAddChild(item.id)}>Add</Button>
                       </div>
 
                       <div>
                         <button
-                          onClick={() => setAddingExistingTo(addingExistingTo === item.id ? null : item.id)}
+                          onClick={() => {
+                            if (addingExistingTo === item.id) {
+                              setAddingExistingTo(null)
+                            } else {
+                              setAddingExistingTo(item.id)
+                              setExistingSearches((prev) => ({ ...prev, [item.id]: '' }))
+                            }
+                          }}
                           className="text-xs text-gray-500 hover:text-gray-900 transition-colors"
                         >
-                          {addingExistingTo === item.id ? 'Cancel' : '+ Add existing item'}
+                          {addingExistingTo === item.id ? 'Cancel' : '+ Add existing task'}
                         </button>
 
                         {addingExistingTo === item.id && (
                           <div className="mt-2 space-y-2">
                             <input
                               type="text"
-                              value={existingSearch}
-                              onChange={(e) => setExistingSearch(e.target.value)}
-                              placeholder="Search singles..."
+                              value={getExistingSearch(item.id)}
+                              onChange={(e) => setExistingSearches((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                              placeholder="Search active tasks..."
                               className="min-h-[36px] w-full rounded-lg border border-gray-300 bg-white px-3 text-sm placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-1"
                             />
                             <div className="max-h-48 overflow-y-auto space-y-1">
-                              {filteredExisting.length === 0 && (
-                                <p className="text-xs text-gray-400 py-2">No unassigned singles found.</p>
+                              {filteredExistingForGroup(item.id).length === 0 && (
+                                <p className="text-xs text-gray-400 py-2">No active unassigned tasks found.</p>
                               )}
-                              {filteredExisting.map((s) => (
+                              {filteredExistingForGroup(item.id).map((s) => (
                                 <div key={s.id} className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-gray-50">
                                   <span className="text-sm text-gray-900">{s.title}</span>
                                   <Button
@@ -518,7 +678,7 @@ export default function WorkPage() {
                                     variant="secondary"
                                     onClick={() => {
                                       addChildToGroup(item.id, s.id)
-                                      setExistingSearch('')
+                                      setExistingSearches((prev) => ({ ...prev, [item.id]: '' }))
                                     }}
                                   >
                                     Add
@@ -540,18 +700,30 @@ export default function WorkPage() {
 
       {deletedItems.length > 0 && (
         <div>
-          <button
-            onClick={() => setShowDeleted((prev) => !prev)}
-            className="flex items-center justify-between w-full text-sm text-gray-400 hover:text-gray-700 transition-colors mb-4"
-          >
-            <span className="font-medium">Deleted ({deletedItems.length})</span>
-            <svg
-              className={`size-4 transition-transform ${showDeleted ? 'rotate-180' : ''}`}
-              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+          <div className="flex items-center justify-between mb-4">
+            <button
+              onClick={() => setShowDeleted((prev) => !prev)}
+              className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-700 transition-colors"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
+              <span className="font-medium">Deleted Tasks ({deletedItems.length})</span>
+              <svg
+                className={`size-4 transition-transform ${showDeleted ? 'rotate-180' : ''}`}
+                fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {showDeleted && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleEmptyTrash}
+                className="text-red-500 hover:text-red-600 hover:bg-red-50"
+              >
+                Empty Trash
+              </Button>
+            )}
+          </div>
           {showDeleted && (
             <div className="space-y-3">
               {deletedItems.map((item) => (
@@ -561,11 +733,11 @@ export default function WorkPage() {
                       {item.type === 'group' && (
                         <span className="rounded bg-purple-50 px-1.5 py-0.5 text-[10px] font-medium text-purple-600">GROUP</span>
                       )}
-                      <p className="font-semibold text-gray-900 text-sm">{item.title}</p>
+                      <p className="text-sm text-gray-500 line-through">{item.title}</p>
                     </div>
                     <div className="flex gap-2">
                       <Button variant="secondary" size="sm" onClick={() => restoreWorkItem(item.id)}>Restore</Button>
-                      <Button variant="ghost" size="sm" onClick={() => permanentDeleteWorkItem(item.id)} className="text-red-400 hover:text-red-600 hover:bg-red-50">Permanently Delete</Button>
+                      <Button variant="ghost" size="sm" onClick={() => permanentDeleteWorkItem(item.id)} className={DELETE_BTN}>Delete Permanently</Button>
                     </div>
                   </div>
                 </Card>

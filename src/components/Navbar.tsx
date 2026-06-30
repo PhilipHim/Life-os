@@ -6,7 +6,8 @@ import { CompassIcon } from '@/design-system/icons'
 
 const links = [
   { href: '/dashboard', label: 'Dashboard' },
-  { href: '/work', label: 'Work' },
+  { href: '/work', label: 'Tasks' },
+  { href: '/routines', label: 'Routines' },
   { href: '/plan', label: 'Planner' },
   { href: '/habits', label: 'Habits' },
   { href: '/life-os', label: 'Life' },

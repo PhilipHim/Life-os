@@ -22,6 +22,10 @@ import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Checkbox from '@/components/ui/Checkbox'
 import EditPlanItemModal from '@/components/EditPlanItemModal'
+import AddRoutineToPlanModal from '@/components/routines/AddRoutineToPlanModal'
+import PlanRoutineCard from '@/components/routines/PlanRoutineCard'
+import { buildPlanTimeline } from '@/lib/routines/plan-timeline'
+import type { TimelineOrderEntry } from '@/lib/routines/plan-ordering'
 
 const priorityColor: Record<string, string> = {
   H1: 'bg-red-500',
@@ -54,7 +58,7 @@ function isTaskBlock(block: ExecutionBlock): block is Extract<ExecutionBlock, { 
 }
 
 export default function PlanPage() {
-  const { todayPlan, addToPlan, removeFromPlan, updatePlanItem, reorderPlanItems, autoPlanToday } =
+  const { todayPlan, addToPlan, removeFromPlan, updatePlanItem, autoPlanToday, todayRoutineBlocks, reorderPlanTimeline } =
     useDailyPlan()
   const { activeWorkItemId, startFocus, stopFocus, focusSessions } = useFocus()
   const { workItems, toggleWorkItem } = useWorkItems()
@@ -62,9 +66,10 @@ export default function PlanPage() {
   const todayStr = today()
   const [editItem, setEditItem] = useState<DailyPlanItem | null>(null)
   const [breakState, setBreakState] = useState(() => getPlannerBreakState(todayStr))
-  const [dragTaskId, setDragTaskId] = useState<string | null>(null)
+  const [dragEntry, setDragEntry] = useState<TimelineOrderEntry | null>(null)
   const [defaultsVersion, setDefaultsVersion] = useState(0)
   const [autoPlanFeedback, setAutoPlanFeedback] = useState<string | null>(null)
+  const [showAddRoutine, setShowAddRoutine] = useState(false)
 
   const plannedWorkItemIds = useMemo(
     () => new Set(todayPlan.map((p) => p.workItemId)),
@@ -105,6 +110,11 @@ export default function PlanPage() {
     [todayPlan, getTitle, breakState]
   )
 
+  const planTimeline = useMemo(
+    () => buildPlanTimeline(executionQueue, todayRoutineBlocks),
+    [executionQueue, todayRoutineBlocks]
+  )
+
   const summary = useMemo(
     () => summarizeExecution(todayPlan, executionQueue),
     [todayPlan, executionQueue]
@@ -132,22 +142,48 @@ export default function PlanPage() {
     setDefaultsVersion((v) => v + 1)
   }
 
-  const handleTaskDragStart = (planItemId: string) => {
-    setDragTaskId(planItemId)
+  const timelineOrderEntries = useMemo((): TimelineOrderEntry[] => {
+    const entries: TimelineOrderEntry[] = []
+    for (const entry of planTimeline) {
+      if (entry.kind === 'routine') {
+        entries.push({ kind: 'routine', id: entry.block.id })
+      } else if (entry.block.kind === 'task') {
+        entries.push({ kind: 'task', id: entry.block.planItem.id })
+      }
+    }
+    return entries
+  }, [planTimeline])
+
+  const handleTimelineDragStart = (entry: TimelineOrderEntry) => {
+    setDragEntry(entry)
   }
 
-  const handleTaskDrop = (targetPlanItemId: string) => {
-    if (!dragTaskId || dragTaskId === targetPlanItemId) return
-    const ids = todayPlan.map((t) => t.id)
-    const fromIdx = ids.indexOf(dragTaskId)
-    const toIdx = ids.indexOf(targetPlanItemId)
+  const handleTimelineDrop = (target: TimelineOrderEntry) => {
+    if (
+      !dragEntry ||
+      (dragEntry.kind === target.kind && dragEntry.id === target.id)
+    ) {
+      return
+    }
+
+    const entries = [...timelineOrderEntries]
+    const fromIdx = entries.findIndex(
+      (e) => e.kind === dragEntry.kind && e.id === dragEntry.id
+    )
+    const toIdx = entries.findIndex(
+      (e) => e.kind === target.kind && e.id === target.id
+    )
     if (fromIdx === -1 || toIdx === -1) return
-    const next = [...ids]
+
+    const next = [...entries]
     const [moved] = next.splice(fromIdx, 1)
     next.splice(toIdx, 0, moved)
-    reorderPlanItems(next)
-    setDragTaskId(null)
+    reorderPlanTimeline(next)
+    setDragEntry(null)
   }
+
+  const isDraggingEntry = (entry: TimelineOrderEntry) =>
+    !!dragEntry && dragEntry.kind === entry.kind && dragEntry.id === entry.id
 
   const handleFocus = (pi: DailyPlanItem) => {
     if (activeWorkItemId === pi.workItemId) {
@@ -191,9 +227,14 @@ export default function PlanPage() {
           </p>
         </div>
         <div className="flex flex-col items-stretch sm:items-end gap-1.5 shrink-0">
-          <Button variant="secondary" disabled={!canAutoPlan} onClick={handleAutoPlan}>
-            Auto Plan
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => setShowAddRoutine(true)}>
+              Add Routine
+            </Button>
+            <Button variant="secondary" disabled={!canAutoPlan} onClick={handleAutoPlan}>
+              Auto Plan
+            </Button>
+          </div>
           {!canAutoPlan ? (
             <p className="text-xs text-gray-400 sm:text-right">No tasks available for planning.</p>
           ) : (
@@ -319,15 +360,39 @@ export default function PlanPage() {
           )}
         </div>
 
-        {todayPlan.length === 0 ? (
+        {todayPlan.length === 0 && todayRoutineBlocks.length === 0 ? (
           <Card className="p-6">
             <p className="text-center text-sm text-gray-400">
-              Your execution queue is empty. Add tasks from Available Tasks above.
+              Your execution queue is empty. Add tasks from Available Tasks or use Add Routine.
             </p>
           </Card>
         ) : (
           <div className="space-y-2">
-            {executionQueue.map((block) => {
+            {planTimeline.map((entry) => {
+              if (entry.kind === 'routine') {
+                const routineEntry: TimelineOrderEntry = {
+                  kind: 'routine',
+                  id: entry.block.id,
+                }
+                return (
+                  <div
+                    key={entry.block.id}
+                    draggable
+                    onDragStart={() => handleTimelineDragStart(routineEntry)}
+                    onDragEnd={() => setDragEntry(null)}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      handleTimelineDrop(routineEntry)
+                    }}
+                    className={isDraggingEntry(routineEntry) ? 'opacity-50' : ''}
+                  >
+                    <PlanRoutineCard block={entry.block} draggable />
+                  </div>
+                )
+              }
+
+              const block = entry.block
               if (block.kind === 'break') {
                 return (
                   <Card
@@ -369,18 +434,19 @@ export default function PlanPage() {
               const focusMs = focusSessions
                 .filter((s) => s.workItemId === pi.workItemId && s.duration > 0)
                 .reduce((sum, s) => sum + s.duration, 0)
-              const isDragging = dragTaskId === pi.id
+              const taskEntry: TimelineOrderEntry = { kind: 'task', id: pi.id }
+              const isDragging = isDraggingEntry(taskEntry)
 
               return (
                 <div
                   key={pi.id}
                   draggable
-                  onDragStart={() => handleTaskDragStart(pi.id)}
-                  onDragEnd={() => setDragTaskId(null)}
+                  onDragStart={() => handleTimelineDragStart(taskEntry)}
+                  onDragEnd={() => setDragEntry(null)}
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => {
                     e.preventDefault()
-                    handleTaskDrop(pi.id)
+                    handleTimelineDrop(taskEntry)
                   }}
                   className={isDragging ? 'opacity-50' : ''}
                 >
@@ -473,6 +539,8 @@ export default function PlanPage() {
           onClose={() => setEditItem(null)}
         />
       )}
+
+      {showAddRoutine && <AddRoutineToPlanModal onClose={() => setShowAddRoutine(false)} />}
     </div>
   )
 }

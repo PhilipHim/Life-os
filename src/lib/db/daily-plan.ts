@@ -46,3 +46,8 @@ export function updateDailyPlanItem(updated: DailyPlanItem): DailyPlanItem[] {
 export function getDailyPlanForDate(date: string): DailyPlanItem[] {
   return getDailyPlanItems().filter((i) => i.date === date)
 }
+
+export function removeDailyPlanItemsByWorkItemId(workItemId: string): DailyPlanItem[] {
+  saveItems(getDailyPlanItems().filter((i) => i.workItemId !== workItemId))
+  return getDailyPlanItems()
+}

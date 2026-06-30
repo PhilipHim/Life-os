@@ -2,10 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import type { WorkItem, Project, Task } from '@/lib/types'
-import { getWorkItems } from '@/lib/db/work-items'
-import { useFocus } from '@/lib/FocusContext'
+import { getPlannerDefaults, setPlannerDefaults, type PlannerTaskDefaults } from '@/lib/planner-defaults'
+import { useWorkItems } from '@/lib/WorkItemContext'
+import { localDateStr } from '@/lib/date-utils'
 import Checkbox from '@/components/ui/Checkbox'
 import Button from '@/components/ui/Button'
+
+const PRIORITY_OPTIONS: Task['priority'][] = ['H1', 'H2', 'M', 'L']
 
 type DetailsPanelProps =
   | {
@@ -30,12 +33,49 @@ type DetailsPanelProps =
       onUpdate: (updated: Project | Task) => void
     }
 
-function calcProgress(entity: WorkItem): number {
+function calcProgress(entity: WorkItem, children: WorkItem[]): number {
   if (entity.type === 'single') return entity.status === 'completed' ? 100 : 0
-  const allItems = getWorkItems()
-  const children = entity.childrenIds.map((id) => allItems.find((i) => i.id === id)).filter(Boolean) as WorkItem[]
   if (children.length === 0) return 0
   return Math.round((children.filter((c) => c.status === 'completed').length / children.length) * 100)
+}
+
+function PriorityDurationFields({
+  priority,
+  duration,
+  onPriorityChange,
+  onDurationChange,
+}: {
+  priority: Task['priority']
+  duration: string
+  onPriorityChange: (value: Task['priority']) => void
+  onDurationChange: (value: string) => void
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-4">
+      <div>
+        <p className="mb-1 text-xs font-medium uppercase tracking-widest text-gray-400">Priority</p>
+        <select
+          value={priority}
+          onChange={(e) => onPriorityChange(e.target.value as Task['priority'])}
+          className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:bg-white"
+        >
+          {PRIORITY_OPTIONS.map((p) => (
+            <option key={p} value={p}>{p}</option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <p className="mb-1 text-xs font-medium uppercase tracking-widest text-gray-400">Duration (min)</p>
+        <input
+          type="number"
+          min={1}
+          value={duration}
+          onChange={(e) => onDurationChange(e.target.value)}
+          className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:bg-white"
+        />
+      </div>
+    </div>
+  )
 }
 
 function SimpleDetailsPanel({
@@ -51,21 +91,64 @@ function SimpleDetailsPanel({
   entity: Project | Task
   onUpdate: (updated: Project | Task) => void
 }) {
+  const isTaskEntity = 'recurring' in entity
   const [title, setTitle] = useState(entity.title)
   const [description, setDescription] = useState(entity.description)
   const [notes, setNotes] = useState(entity.notes)
+  const [priority, setPriority] = useState<Task['priority']>(
+    isTaskEntity ? (entity as Task).priority ?? 'M' : 'M'
+  )
+  const [duration, setDuration] = useState(
+    String(isTaskEntity ? (entity as Task).estimatedDuration ?? 30 : 30)
+  )
+  const [saved, setSaved] = useState(false)
 
   useEffect(() => {
     setTitle(entity.title)
     setDescription(entity.description)
     setNotes(entity.notes)
+    if ('recurring' in entity) {
+      setPriority(entity.priority ?? 'M')
+      setDuration(String(entity.estimatedDuration ?? 30))
+    }
   }, [entity])
 
   const handleSave = () => {
+    if ('recurring' in entity) {
+      onUpdate({
+        ...entity,
+        title: title.trim() || entity.title,
+        description,
+        notes,
+        priority,
+        estimatedDuration: parseInt(duration, 10) || 30,
+      })
+      setSaved(true)
+      window.setTimeout(() => setSaved(false), 2000)
+      return
+    }
     onUpdate({ ...entity, title: title.trim() || entity.title, description, notes })
+    setSaved(true)
+    window.setTimeout(() => setSaved(false), 2000)
   }
 
   const handleToggleComplete = () => {
+    if (isTaskEntity) {
+      const task = entity as Task
+      if (task.recurring !== 'none') {
+        const now = Date.now()
+        const doneToday =
+          task.completed &&
+          task.completedAt &&
+          localDateStr(new Date(task.completedAt)) === localDateStr()
+        if (doneToday) {
+          onUpdate({ ...task, completed: false, completedAt: null })
+        } else {
+          onUpdate({ ...task, completed: true, completedAt: now })
+        }
+        return
+      }
+    }
     onUpdate({ ...entity, completed: !entity.completed })
   }
 
@@ -107,22 +190,32 @@ function SimpleDetailsPanel({
           </div>
 
           <div>
-            <p className="mb-1 text-xs font-medium uppercase tracking-widest text-gray-400">Notes</p>
+            <p className="mb-1 text-xs font-medium uppercase tracking-widest text-gray-400">Details</p>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={5}
-              placeholder="Add notes..."
+              placeholder="Add details..."
               className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-gray-900 focus:bg-white"
             />
           </div>
+
+          {isTaskEntity && (
+            <PriorityDurationFields
+              priority={priority}
+              duration={duration}
+              onPriorityChange={setPriority}
+              onDurationChange={setDuration}
+            />
+          )}
 
           <p className="text-xs text-gray-400">
             Created {new Date(entity.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
           </p>
         </div>
 
-        <div className="border-t border-gray-100 px-6 py-4">
+        <div className="border-t border-gray-100 px-6 py-4 space-y-2">
+          {saved && <p className="text-center text-xs text-green-600">Changes saved</p>}
           <Button onClick={handleSave} className="w-full">Save Changes</Button>
         </div>
       </div>
@@ -151,33 +244,47 @@ function WorkItemDetailsPanel({
   entity: WorkItem
   onUpdate: (updated: WorkItem) => void
 }) {
-  const { startFocus } = useFocus()
+  const { workItems, getChildren } = useWorkItems()
   const [title, setTitle] = useState(entity.title)
   const [description, setDescription] = useState(entity.description)
   const [notes, setNotes] = useState(entity.notes)
+  const [priority, setPriority] = useState<PlannerTaskDefaults['priority']>('M')
+  const [duration, setDuration] = useState('30')
   const [children, setChildren] = useState<WorkItem[]>([])
   const [parent, setParent] = useState<WorkItem | undefined>(undefined)
   const [progress, setProgress] = useState(0)
+  const [saved, setSaved] = useState(false)
 
   useEffect(() => {
     setTitle(entity.title)
     setDescription(entity.description)
     setNotes(entity.notes)
-    setProgress(calcProgress(entity))
+    const defaults = getPlannerDefaults(entity.id)
+    setPriority(defaults.priority)
+    setDuration(String(defaults.estimatedDuration))
+  }, [entity])
 
+  useEffect(() => {
     if (entity.type === 'group') {
-      const allItems = getWorkItems()
-      setChildren(entity.childrenIds.map((id) => allItems.find((i) => i.id === id)).filter(Boolean) as WorkItem[])
+      const groupChildren = getChildren(entity.id)
+      setChildren(groupChildren)
+      setProgress(calcProgress(entity, groupChildren))
       setParent(undefined)
     } else {
-      const allItems = getWorkItems()
-      setParent(allItems.find((i) => i.childrenIds.includes(entity.id)))
+      setParent(workItems.find((i) => i.childrenIds.includes(entity.id)))
       setChildren([])
+      setProgress(entity.status === 'completed' ? 100 : 0)
     }
-  }, [entity])
+  }, [entity.id, entity.type, entity.status, workItems, getChildren])
 
   const handleSave = () => {
     onUpdate({ ...entity, title: title.trim() || entity.title, description, notes })
+    setPlannerDefaults(entity.id, {
+      priority,
+      estimatedDuration: parseInt(duration, 10) || 30,
+    })
+    setSaved(true)
+    window.setTimeout(() => setSaved(false), 2000)
   }
 
   const handleToggleComplete = () => {
@@ -224,15 +331,22 @@ function WorkItemDetailsPanel({
           </div>
 
           <div>
-            <p className="mb-1 text-xs font-medium uppercase tracking-widest text-gray-400">Notes</p>
+            <p className="mb-1 text-xs font-medium uppercase tracking-widest text-gray-400">Details</p>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={5}
-              placeholder="Add notes..."
+              placeholder="Add details..."
               className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-gray-900 focus:bg-white"
             />
           </div>
+
+          <PriorityDurationFields
+            priority={priority}
+            duration={duration}
+            onPriorityChange={setPriority}
+            onDurationChange={setDuration}
+          />
 
           {entity.type === 'group' && (
             <div>
@@ -249,26 +363,13 @@ function WorkItemDetailsPanel({
             </div>
           )}
 
-          {entity.type === 'group' && (
-            <Button
-              variant="secondary"
-              size="md"
-              className="w-full"
-              onClick={() => {
-                onClose()
-                startFocus(entity.id, entity.title)
-              }}
-            >
-              Start Focus Session
-            </Button>
-          )}
-
           {entity.type === 'group' && children.length > 0 && (
             <div>
-              <p className="mb-2 text-xs font-medium uppercase tracking-widest text-gray-400">Children ({children.length})</p>
+              <p className="mb-2 text-xs font-medium uppercase tracking-widest text-gray-400">Tasks ({children.length})</p>
               <div className="space-y-1">
                 {children.map((c) => (
                   <div key={c.id} className="flex items-center gap-2 text-sm text-gray-600">
+                    <span className="text-gray-400">•</span>
                     <span className={c.status === 'completed' ? 'text-gray-400 line-through' : ''}>{c.title}</span>
                   </div>
                 ))}
@@ -290,7 +391,8 @@ function WorkItemDetailsPanel({
           </p>
         </div>
 
-        <div className="border-t border-gray-100 px-6 py-4">
+        <div className="border-t border-gray-100 px-6 py-4 space-y-2">
+          {saved && <p className="text-center text-xs text-green-600">Changes saved</p>}
           <Button onClick={handleSave} className="w-full">Save Changes</Button>
         </div>
       </div>

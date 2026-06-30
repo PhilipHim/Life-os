@@ -262,6 +262,11 @@ export function computeTodayRecurringPlannerStats(
   return { total: countable.length, completed: completed.length }
 }
 
+export function clearRecurringDataForTemplate(templateId: string): void {
+  saveCompletions(getRecurringCompletions().filter((c) => c.templateId !== templateId))
+  saveSkips(getRecurringSkips().filter((s) => s.templateId !== templateId))
+}
+
 export function isRecurringWorkItemCompleted(workItemId: string, workItems: WorkItem[]): boolean {
   const wi = workItems.find((w) => w.id === workItemId)
   if (wi?.recurring && wi.isTemplate) {

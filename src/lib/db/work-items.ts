@@ -136,3 +136,8 @@ export function addWorkItems(items: WorkItem[]): WorkItem[] {
   saveWorkItems([...existing, ...items])
   return getWorkItems()
 }
+
+export function replaceWorkItems(items: WorkItem[]): WorkItem[] {
+  saveWorkItems(items)
+  return getWorkItems()
+}

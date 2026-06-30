@@ -5,6 +5,7 @@ import Navbar from '@/components/Navbar'
 import FocusOverlay from '@/components/FocusOverlay'
 import LevelUpListener from '@/components/profile/LevelUpListener'
 import { WorkItemProvider } from '@/lib/WorkItemContext'
+import { RoutineProvider } from '@/lib/RoutineContext'
 import { TaskProvider } from '@/lib/TaskContext'
 import { FocusProvider } from '@/lib/FocusContext'
 import { HabitProvider } from '@/lib/HabitContext'
@@ -38,14 +39,16 @@ export default function RootLayout({
           <TaskProvider>
             <FocusProvider>
               <HabitProvider>
-                <DailyPlanProvider>
-                  <Navbar />
-                  <main className="los-main mx-auto w-full max-w-6xl flex-1 px-4 py-10 sm:px-8 sm:py-14">
-                    {children}
-                  </main>
-                  <FocusOverlay />
-                  <LevelUpListener />
-                </DailyPlanProvider>
+                <RoutineProvider>
+                  <DailyPlanProvider>
+                    <Navbar />
+                    <main className="los-main mx-auto w-full max-w-6xl flex-1 px-4 py-10 sm:px-8 sm:py-14">
+                      {children}
+                    </main>
+                    <FocusOverlay />
+                    <LevelUpListener />
+                  </DailyPlanProvider>
+                </RoutineProvider>
               </HabitProvider>
             </FocusProvider>
           </TaskProvider>

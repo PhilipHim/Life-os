@@ -32,3 +32,9 @@ export function setPlannerDefaults(workItemId: string, defaults: PlannerTaskDefa
   all[workItemId] = defaults
   saveAll(all)
 }
+
+export function removePlannerDefaults(workItemId: string): void {
+  const all = loadAll()
+  delete all[workItemId]
+  saveAll(all)
+}

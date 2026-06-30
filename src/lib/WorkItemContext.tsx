@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
 import type { WorkItem } from '@/lib/types'
 import {
   getWorkItems,
@@ -9,8 +9,11 @@ import {
   updateWorkItem as persistUpdate,
   updateWorkItems as persistUpdateMany,
   deleteWorkItem as persistDelete,
+  replaceWorkItems,
 } from '@/lib/db/work-items'
-import { getRecurringTemplates } from '@/lib/recurring'
+import { getRecurringTemplates, clearRecurringDataForTemplate } from '@/lib/recurring'
+import { removePlannerDefaults } from '@/lib/planner-defaults'
+import { removeDailyPlanItemsByWorkItemId } from '@/lib/db/daily-plan'
 
 interface WorkItemContextType {
   workItems: WorkItem[]
@@ -19,11 +22,13 @@ interface WorkItemContextType {
   addRecurringWorkItem: (title: string, description: string, recurrenceType: 'daily' | 'weekly', daysOfWeek?: number[]) => void
   toggleWorkItem: (id: string) => void
   deleteWorkItem: (id: string) => void
+  deleteRecurringTemplate: (id: string) => void
   restoreWorkItem: (id: string) => void
   permanentDeleteWorkItem: (id: string) => void
   deleteAllCompleted: () => void
+  emptyTrash: () => void
   updateWorkItem: (updated: WorkItem) => void
-  createGroupWithChildren: (title: string, description: string, children: { title: string; description?: string }[]) => void
+  createGroupWithChildren: (title: string, description: string, children: { title: string; description?: string }[], existingChildIds?: string[]) => void
   addChildToGroup: (groupId: string, childId: string) => void
   removeChildFromGroup: (groupId: string, childId: string) => void
   getChildren: (parentId: string) => WorkItem[]
@@ -36,14 +41,18 @@ interface WorkItemContextType {
 
 const WorkItemContext = createContext<WorkItemContextType | null>(null)
 
+function cleanupWorkItemReferences(item: WorkItem | undefined, id: string): void {
+  if (item?.isTemplate && item.recurring) {
+    clearRecurringDataForTemplate(id)
+  }
+  removePlannerDefaults(id)
+  removeDailyPlanItemsByWorkItemId(id)
+}
+
 export function WorkItemProvider({ children }: { children: ReactNode }) {
   const [workItems, setWorkItems] = useState<WorkItem[]>([])
 
   useEffect(() => {
-    setWorkItems(getWorkItems())
-  }, [])
-
-  const refresh = useCallback(() => {
     setWorkItems(getWorkItems())
   }, [])
 
@@ -103,9 +112,26 @@ export function WorkItemProvider({ children }: { children: ReactNode }) {
     setWorkItems(persistAdd(item))
   }
 
-  const createGroupWithChildren = (title: string, description: string, children: { title: string; description?: string }[]) => {
+  const createGroupWithChildren = (
+    title: string,
+    description: string,
+    children: { title: string; description?: string }[],
+    existingChildIds: string[] = []
+  ) => {
     const now = Date.now()
     const groupId = crypto.randomUUID()
+    const allItems = getWorkItems()
+
+    const validExisting = existingChildIds
+      .map((id) => allItems.find((i) => i.id === id))
+      .filter(
+        (i): i is WorkItem =>
+          !!i &&
+          i.type === 'single' &&
+          i.status === 'active' &&
+          !i.parentId &&
+          !i.isTemplate
+      )
 
     const childItems: WorkItem[] = children.map((c) => ({
       id: crypto.randomUUID(),
@@ -130,15 +156,23 @@ export function WorkItemProvider({ children }: { children: ReactNode }) {
       status: 'active',
       createdAt: now,
       updatedAt: now,
-      childrenIds: childItems.map((c) => c.id),
+      childrenIds: [...childItems.map((c) => c.id), ...validExisting.map((c) => c.id)],
       completedAt: null,
     }
 
-    setWorkItems(persistAddMany([groupItem, ...childItems]))
+    const updatedExisting = validExisting.map((child) => ({
+      ...child,
+      parentId: groupId,
+      updatedAt: now,
+    }))
+
+    persistAddMany([groupItem, ...childItems])
+    if (updatedExisting.length > 0) persistUpdateMany(updatedExisting)
+    setWorkItems(getWorkItems())
   }
 
   const toggleWorkItem = (id: string) => {
-    const item = workItems.find((i) => i.id === id)
+    const item = getWorkItems().find((i) => i.id === id)
     if (!item) return
     const now = Date.now()
     if (item.status === 'completed') {
@@ -148,26 +182,82 @@ export function WorkItemProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const deleteWorkItem = (id: string) => {
-    const item = workItems.find((i) => i.id === id)
+  const deleteRecurringTemplate = (id: string) => {
+    const item = getWorkItems().find((i) => i.id === id)
     if (!item) return
-    setWorkItems(persistUpdate({ ...item, status: 'deleted', updatedAt: Date.now() }))
+    cleanupWorkItemReferences(item, id)
+    setWorkItems(persistDelete(id))
+  }
+
+  const deleteWorkItem = (id: string) => {
+    const all = getWorkItems()
+    const item = all.find((i) => i.id === id)
+    if (!item) return
+    if (item.isTemplate && item.recurring) {
+      deleteRecurringTemplate(id)
+      return
+    }
+    const now = Date.now()
+    const updates: WorkItem[] = [{ ...item, status: 'deleted', updatedAt: now }]
+    if (item.type === 'group') {
+      for (const childId of item.childrenIds) {
+        const child = all.find((i) => i.id === childId)
+        if (child && child.status !== 'deleted') {
+          updates.push({ ...child, status: 'deleted', updatedAt: now })
+        }
+      }
+    }
+    setWorkItems(persistUpdateMany(updates))
   }
 
   const restoreWorkItem = (id: string) => {
-    const item = workItems.find((i) => i.id === id)
+    const all = getWorkItems()
+    const item = all.find((i) => i.id === id)
     if (!item) return
-    setWorkItems(persistUpdate({ ...item, status: 'active', updatedAt: Date.now() }))
+    const now = Date.now()
+    const updates: WorkItem[] = [{ ...item, status: 'active', updatedAt: now }]
+    if (item.type === 'group') {
+      for (const child of all) {
+        if (child.parentId === id && child.status === 'deleted') {
+          updates.push({ ...child, status: 'active', updatedAt: now })
+        }
+      }
+    }
+    setWorkItems(persistUpdateMany(updates))
   }
 
   const permanentDeleteWorkItem = (id: string) => {
+    const all = getWorkItems()
+    const item = all.find((i) => i.id === id)
+    if (!item) return
+    cleanupWorkItemReferences(item, id)
+    if (item.type === 'group') {
+      for (const childId of item.childrenIds) {
+        const child = all.find((i) => i.id === childId)
+        if (child) cleanupWorkItemReferences(child, childId)
+      }
+      setWorkItems(replaceWorkItems(all.filter((i) => i.id !== id && !item.childrenIds.includes(i.id))))
+      return
+    }
     setWorkItems(persistDelete(id))
   }
 
   const deleteAllCompleted = () => {
-    const remaining = workItems.filter((i) => i.status !== 'completed')
-    localStorage.setItem('productivity_work_items', JSON.stringify(remaining))
-    refresh()
+    const current = getWorkItems()
+    const completed = current.filter((i) => i.status === 'completed')
+    for (const item of completed) {
+      cleanupWorkItemReferences(item, item.id)
+    }
+    setWorkItems(replaceWorkItems(current.filter((i) => i.status !== 'completed')))
+  }
+
+  const emptyTrash = () => {
+    const current = getWorkItems()
+    const deleted = current.filter((i) => i.status === 'deleted')
+    for (const item of deleted) {
+      cleanupWorkItemReferences(item, item.id)
+    }
+    setWorkItems(replaceWorkItems(current.filter((i) => i.status !== 'deleted')))
   }
 
   const updateWorkItem = (updated: WorkItem) => {
@@ -175,9 +265,10 @@ export function WorkItemProvider({ children }: { children: ReactNode }) {
   }
 
   const addChildToGroup = (groupId: string, childId: string) => {
-    const group = workItems.find((i) => i.id === groupId)
-    const child = workItems.find((i) => i.id === childId)
-    if (!group || !child || child.type !== 'single' || group.childrenIds.includes(childId)) return
+    const all = getWorkItems()
+    const group = all.find((i) => i.id === groupId)
+    const child = all.find((i) => i.id === childId)
+    if (!group || !child || child.type !== 'single' || child.status !== 'active' || group.childrenIds.includes(childId)) return
     const now = Date.now()
     const updatedGroup = { ...group, childrenIds: [...group.childrenIds, childId], updatedAt: now }
     const updatedChild = { ...child, parentId: groupId, updatedAt: now }
@@ -185,8 +276,9 @@ export function WorkItemProvider({ children }: { children: ReactNode }) {
   }
 
   const removeChildFromGroup = (groupId: string, childId: string) => {
-    const group = workItems.find((i) => i.id === groupId)
-    const child = workItems.find((i) => i.id === childId)
+    const all = getWorkItems()
+    const group = all.find((i) => i.id === groupId)
+    const child = all.find((i) => i.id === childId)
     if (!group || !child) return
     const now = Date.now()
     const updatedGroup = { ...group, childrenIds: group.childrenIds.filter((id) => id !== childId), updatedAt: now }
@@ -223,9 +315,11 @@ export function WorkItemProvider({ children }: { children: ReactNode }) {
         createGroupWithChildren,
         toggleWorkItem,
         deleteWorkItem,
+        deleteRecurringTemplate,
         restoreWorkItem,
         permanentDeleteWorkItem,
         deleteAllCompleted,
+        emptyTrash,
         updateWorkItem,
         addChildToGroup,
         removeChildFromGroup,

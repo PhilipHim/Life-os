@@ -2,18 +2,40 @@
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
 import type { Task } from '@/lib/types'
-import { getTasks, addTask as persistAdd, updateTask as persistUpdate, deleteTask as persistDelete } from '@/lib/db/tasks'
+import {
+  getTasks,
+  addTask as persistAdd,
+  updateTask as persistUpdate,
+  deleteTask as persistDelete,
+  softDeleteTask as persistSoftDelete,
+  restoreTask as persistRestore,
+  deleteAllCompletedTasks as persistDeleteAllCompleted,
+  emptyTrashTasks as persistEmptyTrash,
+} from '@/lib/db/tasks'
+import { localDateStr } from '@/lib/date-utils'
 
 interface TaskContextType {
   tasks: Task[]
-  addTask: (title: string, recurring?: 'daily' | 'weekly') => void
+  addTask: (payload: {
+    title: string
+    description?: string
+    notes?: string
+    recurring?: 'daily' | 'weekly'
+    priority?: Task['priority']
+    estimatedDuration?: number
+  }) => void
+  updateTask: (updated: Task) => void
   toggleTask: (id: string) => void
   deleteTask: (id: string) => void
+  restoreTask: (id: string) => void
+  permanentDeleteTask: (id: string) => void
+  deleteAllCompleted: () => void
+  emptyTrash: () => void
   isCompletedToday: (task: Task) => boolean
 }
 
 function todayStr(): string {
-  return new Date().toISOString().split('T')[0]
+  return localDateStr()
 }
 
 const TaskContext = createContext<TaskContextType | null>(null)
@@ -25,18 +47,32 @@ export function TaskProvider({ children }: { children: ReactNode }) {
     setTasks(getTasks())
   }, [])
 
-  const addTask = (title: string, recurring?: 'daily' | 'weekly') => {
+  const addTask = (payload: {
+    title: string
+    description?: string
+    notes?: string
+    recurring?: 'daily' | 'weekly'
+    priority?: Task['priority']
+    estimatedDuration?: number
+  }) => {
     const task: Task = {
       id: crypto.randomUUID(),
-      title,
-      description: '',
-      notes: '',
+      title: payload.title,
+      description: payload.description ?? '',
+      notes: payload.notes ?? '',
       completed: false,
-      recurring: recurring ?? 'none',
+      deleted: false,
+      recurring: payload.recurring ?? 'none',
       completedAt: null,
       createdAt: Date.now(),
+      priority: payload.priority ?? 'M',
+      estimatedDuration: payload.estimatedDuration ?? 30,
     }
     setTasks(persistAdd(task))
+  }
+
+  const updateTask = (updated: Task) => {
+    setTasks(persistUpdate(updated))
   }
 
   const toggleTask = (id: string) => {
@@ -44,7 +80,7 @@ export function TaskProvider({ children }: { children: ReactNode }) {
     if (!task) return
     const now = Date.now()
     if (task.recurring !== 'none') {
-      if (task.completed && task.completedAt && new Date(task.completedAt).toISOString().split('T')[0] === todayStr()) {
+      if (task.completed && task.completedAt && localDateStr(new Date(task.completedAt)) === todayStr()) {
         setTasks(persistUpdate({ ...task, completed: false, completedAt: null }))
       } else {
         setTasks(persistUpdate({ ...task, completed: true, completedAt: now }))
@@ -57,15 +93,50 @@ export function TaskProvider({ children }: { children: ReactNode }) {
   const isCompletedToday = (task: Task): boolean => {
     if (task.recurring === 'none') return task.completed
     if (!task.completed || !task.completedAt) return false
-    return new Date(task.completedAt).toISOString().split('T')[0] === todayStr()
+    return localDateStr(new Date(task.completedAt)) === todayStr()
   }
 
   const deleteTask = (id: string) => {
+    const task = tasks.find((t) => t.id === id)
+    if (!task) return
+    if (task.recurring !== 'none') {
+      setTasks(persistDelete(id))
+      return
+    }
+    setTasks(persistSoftDelete(id))
+  }
+
+  const restoreTask = (id: string) => {
+    setTasks(persistRestore(id))
+  }
+
+  const permanentDeleteTask = (id: string) => {
     setTasks(persistDelete(id))
   }
 
+  const deleteAllCompleted = () => {
+    setTasks(persistDeleteAllCompleted())
+  }
+
+  const emptyTrash = () => {
+    setTasks(persistEmptyTrash())
+  }
+
   return (
-    <TaskContext.Provider value={{ tasks, addTask, toggleTask, deleteTask, isCompletedToday }}>
+    <TaskContext.Provider
+      value={{
+        tasks,
+        addTask,
+        updateTask,
+        toggleTask,
+        deleteTask,
+        restoreTask,
+        permanentDeleteTask,
+        deleteAllCompleted,
+        emptyTrash,
+        isCompletedToday,
+      }}
+    >
       {children}
     </TaskContext.Provider>
   )
